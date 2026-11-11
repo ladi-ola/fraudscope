@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fraudscope"
+version = "0.1.0"
+description = "Statistical anomaly detection for tabular datasets"
+requires-python = ">=3.10"
+dependencies = ["numpy", "pandas", "scipy", "statsmodels", "matplotlib", "openpyxl"]
+
+[project.optional-dependencies]
+dev = ["pytest", "nbformat", "ruff", "black", "astropy"]
+
+[tool.setuptools]
+packages = ["fraudscope", "benford"]
+package-dir = {"benford" = "benford_py/benford"}
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "benford_py/tests"]

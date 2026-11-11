@@ -1,7 +1,7 @@
 """Common, JSON-compatible result contract."""
 
-from dataclasses import asdict, dataclass, field
 import json
+from dataclasses import asdict, dataclass, field
 
 import numpy as np
 

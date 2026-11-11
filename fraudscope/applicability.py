@@ -32,11 +32,17 @@ def benford_applicable(series, strict: bool = False) -> tuple[bool, list[str]]:
         reasons.append("Fewer than 1000 positives; estimates may be unstable.")
     if len(positives) == 0 or positives.max() / positives.min() < 1000:
         reasons.append("Positive values span fewer than three orders of magnitude.")
-    if len(positives) and (positives.value_counts(normalize=True).iloc[0] > 0.1 or
-                           positives.value_counts(normalize=True).head(5).sum() > 0.3):
+    if len(positives) and (
+        positives.value_counts(normalize=True).iloc[0] > 0.1
+        or positives.value_counts(normalize=True).head(5).sum() > 0.3
+    ):
         reasons.append("Many repeated values; rounding or conventions may dominate.")
-    if len(positives) >= 30 and (np.mean(np.isclose(positives.to_numpy() % 100, 0, atol=1e-8)) > 0.5):
-        reasons.append("Many values are multiples of 100; round-value conventions may dominate.")
+    if len(positives) >= 30 and (
+        np.mean(np.isclose(positives.to_numpy() % 100, 0, atol=1e-8)) > 0.5
+    ):
+        reasons.append(
+            "Many values are multiples of 100; round-value conventions may dominate."
+        )
     if len(positives) >= 30:
         arr = np.sort(positives.to_numpy())
         lengths = np.floor(np.log10(arr)).astype(int)

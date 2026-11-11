@@ -3,4 +3,4 @@
 from .results import TestResult
 from .runner import Config, RegressionSpec, run_all
 
-__all__ = ["TestResult", "Config", "RegressionSpec", "run_all"]
+__all__ = ["Config", "RegressionSpec", "TestResult", "run_all"]

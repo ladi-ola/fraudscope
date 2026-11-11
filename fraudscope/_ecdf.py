@@ -25,6 +25,7 @@ def reference_data(values, reference):
             raise ValueError("Benford mantissas require positive observations.")
         transformed = np.mod(np.log10(values.to_numpy(dtype=float)), 1)
         from scipy.stats import uniform
+
         return pd.Series(transformed, index=values.index), uniform.cdf, "uniform", True
     if hasattr(reference, "cdf"):
         return values, reference.cdf, repr(reference), True
@@ -34,12 +35,23 @@ def reference_data(values, reference):
     bins, probabilities = reference
     bins = np.asarray(bins, dtype=float)
     probabilities = np.asarray(probabilities, dtype=float)
-    if (bins.ndim != 1 or len(bins) != len(probabilities) or len(bins) < 2 or
-            not np.all(np.diff(bins) > 0) or np.any(probabilities < 0) or
-            not np.isclose(probabilities.sum(), 1)):
-        raise ValueError("Discrete reference requires sorted bins and normalized probabilities.")
+    if (
+        bins.ndim != 1
+        or len(bins) != len(probabilities)
+        or len(bins) < 2
+        or not np.all(np.diff(bins) > 0)
+        or np.any(probabilities < 0)
+        or not np.isclose(probabilities.sum(), 1)
+    ):
+        raise ValueError(
+            "Discrete reference requires sorted bins and normalized probabilities."
+        )
+
     def cdf(x):
-        return np.r_[0, np.cumsum(probabilities)][np.searchsorted(bins, x, side="right")]
+        return np.r_[0, np.cumsum(probabilities)][
+            np.searchsorted(bins, x, side="right")
+        ]
+
     return values, cdf, "discrete", False
 
 
@@ -54,23 +66,38 @@ def one_sample_d(x, cdf, discrete=False):
         raise ValueError("CDF must return finite probabilities per observation.")
     plus = np.arange(1, n + 1) / n - f
     if discrete:
-        unique, starts, counts = np.unique(ordered, return_index=True, return_counts=True)
-        left = np.maximum(0, np.asarray(cdf(np.nextafter(unique, -np.inf)), dtype=float))
+        unique, starts, counts = np.unique(
+            ordered, return_index=True, return_counts=True
+        )
+        left = np.maximum(
+            0, np.asarray(cdf(np.nextafter(unique, -np.inf)), dtype=float)
+        )
         minus = np.repeat(left - starts / n, counts)
     else:
         minus = f - np.arange(n) / n
     ip, im = np.argmax(plus), np.argmax(minus)
-    return float(max(plus[ip], 0)), float(max(minus[im], 0)), float(ordered[ip]), float(ordered[im])
+    return (
+        float(max(plus[ip], 0)),
+        float(max(minus[im], 0)),
+        float(ordered[ip]),
+        float(ordered[im]),
+    )
 
 
 def two_sample_d(a, b):
     """Evaluate both right-continuous ECDFs at every unique observation."""
     a, b = np.sort(a), np.sort(b)
     points = np.union1d(a, b)
-    difference = (np.searchsorted(a, points, side="right") / len(a) -
-                  np.searchsorted(b, points, side="right") / len(b))
+    difference = np.searchsorted(a, points, side="right") / len(a) - np.searchsorted(
+        b, points, side="right"
+    ) / len(b)
     ip, im = np.argmax(difference), np.argmin(difference)
-    return float(max(0, difference[ip])), float(max(0, -difference[im])), float(points[ip]), float(points[im])
+    return (
+        float(max(0, difference[ip])),
+        float(max(0, -difference[im])),
+        float(points[ip]),
+        float(points[im]),
+    )
 
 
 def mc_one(x, bins, probabilities, observed, statistic, n_sim, random_state):
@@ -78,8 +105,10 @@ def mc_one(x, bins, probabilities, observed, statistic, n_sim, random_state):
         raise ValueError("n_sim must be positive")
     rng = np.random.default_rng(random_state)
     cumsum = np.r_[0, np.cumsum(probabilities)]
+
     def cdf(v):
         return cumsum[np.searchsorted(bins, v, side="right")]
+
     exceed = 0
     for _ in range(n_sim):
         draw = rng.choice(bins, size=len(x), p=probabilities)
@@ -93,6 +122,12 @@ def details(values, cdf, label, dp, dm, xp, xm):
     evaluated = np.asarray(cdf(ordered))
     if evaluated.shape == ():
         evaluated = np.asarray([cdf(v) for v in ordered])
-    return {"sample": ordered.tolist(), "reference_cdf": evaluated.tolist(),
-            "reference": label, "D_plus": dp, "D_minus": dm,
-            "x_plus": xp, "x_minus": xm}
+    return {
+        "sample": ordered.tolist(),
+        "reference_cdf": evaluated.tolist(),
+        "reference": label,
+        "D_plus": dp,
+        "D_minus": dm,
+        "x_plus": xp,
+        "x_minus": xm,
+    }

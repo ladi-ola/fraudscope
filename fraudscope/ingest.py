@@ -22,10 +22,19 @@ def load(path: str | Path, columns: list[str] | None = None) -> pd.DataFrame:
     if columns is not None:
         df = df[columns].copy()
     for col in df:
-        if pd.api.types.is_object_dtype(df[col]) or pd.api.types.is_string_dtype(df[col]):
+        if pd.api.types.is_object_dtype(df[col]) or pd.api.types.is_string_dtype(
+            df[col]
+        ):
             trimmed = df[col].map(lambda x: x.strip() if isinstance(x, str) else x)
             converted = pd.to_numeric(trimmed, errors="coerce")
-            df[col] = converted if converted.notna().sum() == trimmed.notna().sum() else trimmed
-    df.attrs["cleaning"] = {"rows": len(df), "dropped_rows": 0,
-                            "nan_counts": df.isna().sum().to_dict()}
+            df[col] = (
+                converted
+                if converted.notna().sum() == trimmed.notna().sum()
+                else trimmed
+            )
+    df.attrs["cleaning"] = {
+        "rows": len(df),
+        "dropped_rows": 0,
+        "nan_counts": df.isna().sum().to_dict(),
+    }
     return df

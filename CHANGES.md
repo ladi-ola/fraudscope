@@ -3,9 +3,19 @@
 Upstream `benford_py` baseline: `0126c606ae9c27cba43e6dc83b73bb329f839ae4`.
 Original BSD-3-Clause license, author attribution and original package retained.
 
+Baseline on Python 3.14 / NumPy 2.5 / pandas 3.1: unmodified tests failed to
+collect (`np.float_` removed). A temporary alias, without modifying source,
+gave 314 passed and 22 warnings: pandas `set_index(inplace=True)` deprecations,
+pytest iterator parametrization deprecations, and a NumPy masked-log warning.
+After the compatibility change the suite runs without a shim; legacy warnings
+remain. No legacy functions, reports or plots were changed.
+
 Structural: root `pyproject.toml` builds both `fraudscope` and the existing
 `benford` package in one editable install; the upstream Git repository remains
 nested and is committed separately.
+Because the upstream directory is a nested Git clone, the outer repository
+tracks its local commit as a gitlink. Preserve the nested checkout when moving
+this workspace; its new commit has not been pushed anywhere.
 
 Upstream edits (additive, no legacy runtime behavior changed):
 - `benford_py/benford/digits.py`: add four-mode extraction and normalized

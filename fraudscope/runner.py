@@ -32,6 +32,7 @@ class Config:
     n_sim: int = 10_000
     top_k: int = 3
     decimals: int = 2
+    ml_enabled: bool = True
 
 
 def run_all(df: pd.DataFrame, config: Config) -> list[TestResult]:

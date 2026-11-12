@@ -26,3 +26,8 @@ Upstream edits (additive, no legacy runtime behavior changed):
 - `benford_py/tests/conftest.py`, `benford_py/tests/test_stats.py`: replace
   removed NumPy 2 `float_` alias with `float64` to restore test collection;
   assertions and expected behavior remain identical.
+
+v2 additive v1-module change:
+- `fraudscope/runner.py`: append `Config.ml_enabled=True` so the new service can
+  offer optional ranking. `run_all`, existing positional arguments and
+  statistical outputs retain their v1 behavior; no upstream files changed.

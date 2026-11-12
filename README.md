@@ -42,6 +42,9 @@ Missing features receive median imputation and missing indicators; under 30
 rows scoring is disabled. The index is 100 × (0.2 × review share + 0.5 × mean
 normalized effect + 0.3 × mean adjusted significance), with components shown
 in exports. These scales are design choices, not universal statistical cutoffs.
+Because scores are rank-normalized, the default 0.90 review threshold selects
+roughly the highest 10% even for clean data; the review-share component alone
+must never be read as evidence that a dataset is anomalous.
 Effects are clipped at MAD .015/.012/.0022/.01 for first/second/first-two/
 last-two digits, KS D .2, and Kuiper V .3. Significance is
 `max(0, 1 - adjusted_p / .05)` for eligible distribution tests. The .2 and

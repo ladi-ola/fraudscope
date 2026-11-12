@@ -108,3 +108,10 @@ def test_ml_ablation_metrics(data, capsys):
         }
     )
     assert "forest_auc" in capsys.readouterr().out
+
+
+def test_index_clean_vs_digit_preference(data):
+    rng = np.random.default_rng(9)
+    clean = pd.DataFrame({"amount": 10 ** rng.uniform(1, 6, len(data))})
+    config = Config(["amount"], random_state=3)
+    assert run_analysis(clean, config).ml_output.index < run_analysis(data, config).ml_output.index

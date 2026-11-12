@@ -3,7 +3,6 @@
 import hashlib
 import io
 import json
-import os
 import sys
 from pathlib import Path
 
@@ -24,10 +23,7 @@ from fraudscope.report.figures import (
     score_figure,
 )
 from fraudscope.runner import Config, RegressionSpec
-from fraudscope.service import run_analysis
-
-MAX_BYTES = int(os.environ.get("ANALYSIS_MAX_MB", "50")) * 1024 * 1024
-MAX_ROWS = int(os.environ.get("ANALYSIS_MAX_ROWS", "100000"))
+from fraudscope.service import profile_dataset, run_analysis
 
 
 @st.cache_data(show_spinner=False)
@@ -66,11 +62,7 @@ raw = None
 if uploaded is not None:
     name = uploaded.name
     raw = uploaded.getvalue()
-    if len(raw) > MAX_BYTES:
-        st.error(
-            f"This file exceeds the {MAX_BYTES // (1024 * 1024)} MB upload limit. Choose a smaller file."
-        )
-    elif not raw:
+    if not raw:
         st.error("This file is empty. Choose a CSV or XLSX with data rows.")
     else:
         try:
@@ -113,8 +105,6 @@ if df is not None:
 if df is not None:
     if df.empty or len(df.columns) == 0:
         st.warning("No data rows and columns were found.")
-    elif len(df) > MAX_ROWS:
-        st.error(f"This dataset exceeds the {MAX_ROWS:,} row limit.")
     else:
         st.subheader("Preview and profile")
         st.dataframe(df.head(), use_container_width=True)
@@ -123,10 +113,16 @@ if df is not None:
             pd.DataFrame({"dtype": df.dtypes.astype(str), "missing": df.isna().sum()})
         )
         numeric = list(df.select_dtypes(include="number").columns)
+        observed_profile = profile_dataset(df)["column_profiles"]
         for col in numeric:
             ok, reasons = benford_applicable(df[col])
+            info = observed_profile[col]
             st.caption(
-                f"{col}: digit suitability {'OK' if ok else 'caution'} · {'; '.join(reasons) if reasons else 'No heuristic concerns'}"
+                f"{col}: {info['finite_count']} finite, {info['positive_count']} positive; "
+                f"range {info['finite_min']} to {info['finite_max']}; "
+                f"positive magnitude span {info['positive_orders_span']} orders · "
+                f"digit suitability {'OK' if ok else 'caution'} · "
+                f"{'; '.join(reasons) if reasons else 'No heuristic concerns'}"
             )
         if not numeric:
             st.warning("Choose a dataset with at least one numeric column.")
@@ -225,7 +221,11 @@ if df is not None:
                     ]
                 )
                 with tabs[0]:
-                    index = bundle.ml_output.index if bundle.ml_output else None
+                    index = (
+                        bundle.ml_output.index
+                        if bundle.ml_output and bundle.ml_output.scores
+                        else None
+                    )
                     st.metric(
                         "Relative anomaly index",
                         f"{index}/100" if index is not None else "Unavailable",

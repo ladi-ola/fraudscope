@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from functools import partial
 from importlib.metadata import PackageNotFoundError, version
 
+import numpy as np
 import pandas as pd
 
 from .applicability import benford_applicable, continuous_applicable
@@ -21,9 +22,28 @@ def profile_dataset(df: pd.DataFrame) -> dict:
     for name in df:
         benford_ok, benford_reasons = benford_applicable(df[name])
         continuous_ok, continuous_reasons = continuous_applicable(df[name])
+        numeric = pd.to_numeric(df[name], errors="coerce").to_numpy(dtype=float)
+        finite = numeric[np.isfinite(numeric)]
+        positive = finite[finite > 0]
         columns[str(name)] = {
             "dtype": str(df[name].dtype),
             "missing": int(df[name].isna().sum()),
+            "finite_count": len(finite),
+            "positive_count": len(positive),
+            "finite_min": float(finite.min()) if len(finite) else None,
+            "finite_max": float(finite.max()) if len(finite) else None,
+            "positive_min": float(positive.min()) if len(positive) else None,
+            "positive_max": float(positive.max()) if len(positive) else None,
+            "positive_orders_span": (
+                float(np.log10(positive.max()) - np.log10(positive.min()))
+                if len(positive)
+                else None
+            ),
+            "ecdf_95_band": (
+                float(min(1, np.sqrt(np.log(40) / (2 * len(finite)))))
+                if len(finite)
+                else None
+            ),
             "benford": "ok" if benford_ok else "caution",
             "benford_reasons": benford_reasons,
             "continuous": "ok" if continuous_ok else "caution",

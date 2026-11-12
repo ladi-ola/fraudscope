@@ -13,10 +13,11 @@ import pytest
 from matplotlib.figure import Figure
 from sklearn.metrics import roc_auc_score
 
+from fraudscope.applicability import benford_applicable, continuous_applicable
 from fraudscope.findings import FindingsEngine, severity
 from fraudscope.report.export import findings_json, html_report, pdf_report
 from fraudscope.report.figures import digit_figure
-from fraudscope.runner import Config
+from fraudscope.runner import Config, RegressionSpec
 from fraudscope.service import run_analysis
 
 
@@ -45,11 +46,51 @@ def test_service_graceful_and_deterministic(data):
 
 def test_tiny_missing_and_constant():
     tiny = run_analysis(pd.DataFrame({"amount": [1.0, None, 2.0]}), Config(["amount"]))
-    assert tiny.ml_output.warning
+    assert len(tiny.ml_output.scores) == 3
+    assert tiny.dataset_profile["column_profiles"]["amount"]["positive_count"] == 2
     constant = run_analysis(
         pd.DataFrame({"amount": [10.0] * 35}), Config(["amount"], benford_modes=[])
     )
     assert constant.ml_output.warning
+    single = run_analysis(pd.DataFrame({"amount": [7.0]}), Config(["amount"]))
+    assert "Anomaly index: Not available" in html_report(single)
+    assert pdf_report(single).startswith(b"%PDF")
+
+
+def test_no_fixed_minimum_and_reported_sample_scale():
+    values = [1.0, 400.0]
+    assert benford_applicable(values, strict=True)[0]
+    assert continuous_applicable(values, strict=True)[0]
+    bundle = run_analysis(
+        pd.DataFrame({"amount": values}), Config(["amount"], ml_enabled=False)
+    )
+    profile = bundle.dataset_profile["column_profiles"]["amount"]
+    assert profile["finite_count"] == profile["positive_count"] == 2
+    assert profile["positive_orders_span"] == pytest.approx(np.log10(400))
+    assert profile["ecdf_95_band"] == pytest.approx(np.sqrt(np.log(40) / 4))
+    assert bundle.results[0].n == 2 and bundle.results[0].p_value is not None
+    html = html_report(bundle)
+    assert "2 finite numeric values" in html
+    assert "400.0" in html and "uncertainty" in html
+    assert pdf_report(bundle).startswith(b"%PDF")
+
+
+def test_small_regression_uses_model_degrees_of_freedom():
+    rng = np.random.default_rng(4)
+    x = np.arange(12, dtype=float)
+    frame = pd.DataFrame({"x": x, "y": 2 + 3 * x + rng.normal(size=12)})
+    bundle = run_analysis(
+        frame,
+        Config(
+            ["y"],
+            benford_modes=[],
+            regression=RegressionSpec("y", ["x"]),
+            strict=True,
+            ml_enabled=False,
+        ),
+    )
+    assert bundle.results[0].n == 12
+    assert bundle.results[0].p_value is not None
 
 
 def test_findings_thresholds(data):
@@ -114,4 +155,7 @@ def test_index_clean_vs_digit_preference(data):
     rng = np.random.default_rng(9)
     clean = pd.DataFrame({"amount": 10 ** rng.uniform(1, 6, len(data))})
     config = Config(["amount"], random_state=3)
-    assert run_analysis(clean, config).ml_output.index < run_analysis(data, config).ml_output.index
+    assert (
+        run_analysis(clean, config).ml_output.index
+        < run_analysis(data, config).ml_output.index
+    )

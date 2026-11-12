@@ -40,6 +40,23 @@ def build_report(bundle, *, top_n=20):
             "adjusted_p": result.details.get("p_adjusted"),
             "effect_size": result.effect_size,
         }
+        if result.column in bundle.dataset_profile["column_profiles"]:
+            profile = bundle.dataset_profile["column_profiles"][result.column]
+            numbers.update(
+                {
+                    key: profile[key]
+                    for key in (
+                        "finite_count",
+                        "positive_count",
+                        "finite_min",
+                        "finite_max",
+                        "positive_min",
+                        "positive_max",
+                        "positive_orders_span",
+                        "ecdf_95_band",
+                    )
+                }
+            )
         charts = []
         if name.startswith("benford_"):
             numbers.update(
@@ -176,6 +193,9 @@ def build_report(bundle, *, top_n=20):
             {p for r in bundle.results for p in r.flagged_indices}
             | (set(ml.flagged_indices) if ml else set())
         )[:top_n],
-        "index": ml.index if ml else None,
-        "components": ml.components if ml else {},
+        "index": ml.index if ml and ml.scores else None,
+        "components": ml.components if ml and ml.scores else {},
+        "scoring_warning": (
+            ml.warning if ml else bundle.run_metadata.get("scoring_warning")
+        ),
     }

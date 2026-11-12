@@ -10,7 +10,6 @@ from sklearn.preprocessing import RobustScaler
 from .explain import top_contributors
 from .features import make_features
 
-MIN_ROWS = 30
 THRESHOLD = 0.9
 
 
@@ -79,7 +78,7 @@ def anomaly_index(results, scores, threshold=THRESHOLD):
 
 
 def score_records(df, config, results):
-    """Score at least 30 rows, with median imputation and missing indicators."""
+    """Score any nonempty set with variable features; no sample-count gate."""
     n = len(df)
     # Tests-only ablation: one vote per digit/ECDF flag, two for a regression
     # diagnostic flag (the latter combines residual and influence checks).
@@ -91,11 +90,8 @@ def score_records(df, config, results):
         baseline[positions[(positions >= 0) & (positions < n)]] += (
             2 if result.test_name == "regression" else 1
         )
-    if n < MIN_ROWS:
-        return AnomalyOutput(
-            baseline=baseline.tolist(),
-            warning=f"Anomaly scoring requires at least {MIN_ROWS} rows.",
-        )
+    if not n:
+        return AnomalyOutput(baseline=baseline.tolist(), warning="No records to score.")
     features = make_features(df, config, results)
     if features.empty or features.notna().sum().sum() == 0:
         return AnomalyOutput(

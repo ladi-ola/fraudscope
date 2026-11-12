@@ -70,13 +70,20 @@ def pdf_report(bundle):
     paragraph("Results indicate statistical anomalies, not proof of wrongdoing.")
     paragraph(
         f"Anomaly index: {data['index']} / 100 (relative indicator, not a probability)"
+        if data["index"] is not None
+        else "Anomaly index unavailable for these data."
     )
+    if data["scoring_warning"]:
+        paragraph("Scoring note: " + data["scoring_warning"])
     paragraph(f"Components: {data['components']}")
     picture(data["cover"])
     paragraph("Executive summary", "Heading1")
     for finding in data["summary"]:
         paragraph(f"{finding.severity}: {finding.statement}")
     paragraph("Dataset profile and applicability", "Heading1")
+    paragraph(
+        "No fixed sample-size minimum applies. The profile gives eligible counts and observed value ranges. Smaller counts imply wider uncertainty; narrow ranges can limit the meaning of digit comparisons. The conservative 95% ECDF uncertainty bound is min(1, sqrt(log(40)/(2n))) for n independent finite observations, not a fitted-reference p-value."
+    )
     paragraph(str(data["profile"]))
     for section in data["sections"]:
         paragraph(section["title"], "Heading1")
@@ -107,7 +114,7 @@ def pdf_report(bundle):
     paragraph(str(data["flagged_rows"]))
     paragraph("Methodology and limitations", "Heading1")
     paragraph(
-        "Benford MAD uses Nigrini descriptive cutoffs; KS D and Kuiper V use descriptive design scales of 0.2 and 0.3, not universal critical values. P-values may be asymptotic or Monte Carlo; valid run p-values use Benjamini-Hochberg adjustment. Isolation Forest is unsupervised and scores are within-dataset ranks. The index is 100 × (0.2 × review share + 0.5 × normalized distribution effect + 0.3 × adjusted significance)."
+        "There is no fixed row-count or magnitude-span eligibility threshold. The uncertainty bound decreases with the number of independent observations. Benford chi-square calibration is unreliable if expected bin counts fall below five, and results are warned rather than suppressed. Benford MAD uses Nigrini descriptive cutoffs; KS D and Kuiper V use descriptive design scales of 0.2 and 0.3, not universal critical values. P-values may be asymptotic or Monte Carlo; valid run p-values use Benjamini-Hochberg adjustment. Isolation Forest is unsupervised and scores are within-dataset ranks. The index is 100 × (0.2 × review share + 0.5 × normalized distribution effect + 0.3 × adjusted significance)."
     )
     paragraph("Reproducibility", "Heading1")
     paragraph(str(data["metadata"]))

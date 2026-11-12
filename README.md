@@ -33,13 +33,21 @@ CSV/XLSX in memory → app/main.py → service.run_analysis → AnalysisBundle
 ```
 
 The app does not upload data to any external service or persist uploaded data
-to disk. Its default limit is 50 MB and 100,000 rows. Exports are assembled in
-memory. The core v1 package remains usable without Streamlit installed.
+to disk. No application-specific file-size or row-count cutoff is applied;
+uploads are still bounded by available memory and Streamlit's configurable
+`server.maxUploadSize` setting (200 MB by default). Increase that setting in
+your Streamlit configuration for larger files. Exports are assembled in memory.
+The core v1 package remains usable without Streamlit installed. All available
+sample sizes are analyzed, with observed counts and magnitude spans included in
+the report rather than a fixed minimum-count suitability rule. Sparse samples
+may produce unstable estimates; the report includes a conservative ECDF
+uncertainty bound based on the observed finite count.
 
 Isolation Forest ranks records *relative to the current dataset*; its score and
 the 0–100 descriptive index are **not probabilities or evidence of intent**.
-Missing features receive median imputation and missing indicators; under 30
-rows scoring is disabled. The index is 100 × (0.2 × review share + 0.5 × mean
+Missing features receive median imputation and missing indicators; scoring is
+disabled only when no records or no variable numeric features are available.
+Very small sets can yield unstable relative rankings. The index is 100 × (0.2 × review share + 0.5 × mean
 normalized effect + 0.3 × mean adjusted significance), with components shown
 in exports. These scales are design choices, not universal statistical cutoffs.
 Because scores are rank-normalized, the default 0.90 review threshold selects

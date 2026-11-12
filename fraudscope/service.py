@@ -5,6 +5,7 @@ import json
 import time
 from dataclasses import asdict
 from datetime import datetime, timezone
+from functools import partial
 from importlib.metadata import PackageNotFoundError, version
 
 import pandas as pd
@@ -58,15 +59,55 @@ def run_analysis(
     metadata["package_versions"] = {}
     for package in ("fraudscope", "numpy", "pandas", "scipy", "scikit-learn"):
         try:
-            metadata["package_versions"]["analysis package" if package == "fraudscope" else package] = version(package)
+            metadata["package_versions"][
+                "analysis package" if package == "fraudscope" else package
+            ] = version(package)
         except PackageNotFoundError:
-            metadata["package_versions"]["analysis package" if package == "fraudscope" else package] = "not installed"
+            metadata["package_versions"][
+                "analysis package" if package == "fraudscope" else package
+            ] = "not installed"
     bundle = AnalysisBundle(results, profile, metadata)
     if config.ml_enabled:
-        from .ml.anomaly import score_records
-
-        bundle.ml_output = score_records(df, config, results)
+        try:
+            from .ml.anomaly import score_records
+        except ModuleNotFoundError as exc:
+            if exc.name != "sklearn":
+                raise
+            metadata["scoring_warning"] = (
+                "Install the app extra to enable anomaly scoring."
+            )
+        else:
+            bundle.ml_output = score_records(df, config, results)
     from .findings import FindingsEngine
 
     bundle.findings = FindingsEngine().build(results, bundle.ml_output)
+    # Lazily construct figures so callers control display and closing.
+    from .report.figures import (
+        digit_figure,
+        mantissa_figure,
+        plot_ecdf_vs_reference,
+        plot_residuals,
+        score_figure,
+    )
+
+    for i, result in enumerate(results):
+        if result.p_value is None:
+            continue
+        if result.test_name.startswith("benford_"):
+            bundle.figures[f"{i}:primary"] = partial(digit_figure, result)
+            bundle.figures[f"{i}:log"] = partial(digit_figure, result, "log")
+            bundle.figures[f"{i}:deviation"] = partial(
+                digit_figure, result, "deviation"
+            )
+            if result.column in df:
+                values = pd.to_numeric(df[result.column], errors="coerce").to_numpy(
+                    dtype=float
+                )
+                bundle.figures[f"{i}:mantissa"] = partial(mantissa_figure, values)
+        elif result.test_name in ("ks_one_sample", "kuiper_one_sample"):
+            bundle.figures[f"{i}:ecdf"] = partial(plot_ecdf_vs_reference, result)
+        elif result.test_name == "regression":
+            bundle.figures[f"{i}:residuals"] = partial(plot_residuals, result)
+    if bundle.ml_output and bundle.ml_output.scores:
+        bundle.figures["ml:scores"] = partial(score_figure, bundle.ml_output.scores)
     return bundle

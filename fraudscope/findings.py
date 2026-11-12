@@ -122,6 +122,41 @@ class FindingsEngine:
                         f"{i}:residuals",
                     )
                 )
+                for check in ("breusch_pagan", "normality"):
+                    p = result.details[check]["p_value"]
+                    findings.append(
+                        Finding(
+                            f"{i}:{check}",
+                            section,
+                            column,
+                            check,
+                            p,
+                            0.05,
+                            "below" if p < 0.05 else "above",
+                            "notable" if p < 0.05 else "info",
+                            f"{column}: {check.replace('_', ' ')} diagnostic p={p:.4g} (reference 0.05).",
+                            caveats,
+                            f"{i}:residuals",
+                        )
+                    )
+                for group in result.details.get("flagged_groups", []):
+                    item = result.details["groups"][group]
+                    mean = item["mean_residual"]
+                    findings.append(
+                        Finding(
+                            f"{i}:group:{group}",
+                            section,
+                            column,
+                            "group_mean_residual",
+                            mean,
+                            0.0,
+                            "above" if mean > 0 else "below",
+                            "notable",
+                            f"{column} group {group}: mean residual {mean:.4g} across {item['n']} rows exceeds the exploratory group bound.",
+                            caveats,
+                            f"{i}:groups",
+                        )
+                    )
         if ml_output is not None and ml_output.scores:
             share = ml_output.components["review_share"]
             findings.append(
@@ -139,9 +174,42 @@ class FindingsEngine:
                     "ml:scores",
                 )
             )
+            from collections import Counter
+
+            top = Counter(
+                name for names in ml_output.contributions.values() for name in names
+            ).most_common(3)
+            for rank, (feature, count) in enumerate(top):
+                findings.append(
+                    Finding(
+                        f"ml:feature:{rank}",
+                        "anomaly_scoring",
+                        None,
+                        "contributing_feature_count",
+                        float(count),
+                        0.0,
+                        "above",
+                        "info",
+                        f"Feature {feature} appeared among the top three contributors for {count} reviewed records.",
+                        ["ml:ranking"],
+                        "ml:scores",
+                    )
+                )
         return findings
 
 
-def findings_document(findings):
+def findings_document(findings, results=()):
     """Stable schema for downstream consumers; text is generated only here."""
-    return {"schema_version": "1.0", "findings": [asdict(f) for f in findings]}
+    caveats = {
+        f"{i}:{j}": text
+        for i, result in enumerate(results)
+        for j, text in enumerate(result.caveats)
+    }
+    caveats["ml:ranking"] = (
+        "Unusual records may reflect legitimate collection or entry conventions; scores are relative."
+    )
+    return {
+        "schema_version": "1.0",
+        "findings": [asdict(f) for f in findings],
+        "caveats": caveats,
+    }

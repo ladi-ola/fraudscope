@@ -89,6 +89,27 @@ elif sample_choice != "None" or st.session_state.get("use_sample"):
     )
 
 if df is not None:
+    df.columns = df.columns.astype(str).str.strip()
+    if not df.columns.is_unique:
+        st.error("Column names must be unique after removing surrounding whitespace.")
+        df = None
+
+if df is not None:
+    for col in df.columns:
+        if pd.api.types.is_object_dtype(df[col]) or pd.api.types.is_string_dtype(
+            df[col]
+        ):
+            trimmed = df[col].map(
+                lambda value: value.strip() if isinstance(value, str) else value
+            )
+            numeric_values = pd.to_numeric(trimmed, errors="coerce")
+            df[col] = (
+                numeric_values
+                if numeric_values.notna().sum() == trimmed.notna().sum()
+                else trimmed
+            )
+
+if df is not None:
     if df.empty or len(df.columns) == 0:
         st.warning("No data rows and columns were found.")
     elif len(df) > MAX_ROWS:
@@ -214,13 +235,34 @@ if df is not None:
                     if bundle.ml_output:
                         st.json(bundle.ml_output.components)
                     for result in bundle.results:
-                        st.metric(
-                            f"{result.test_name}: {result.column}",
+                        st.subheader(f"{result.test_name}: {result.column}")
+                        cards = st.columns(4)
+                        cards[0].metric(
+                            "Statistic",
                             (
-                                str(round(result.effect_size, 4))
+                                f"{result.statistic:.4g}"
+                                if isinstance(result.statistic, (int, float))
+                                else str(result.statistic)
+                            ),
+                        )
+                        cards[1].metric(
+                            "Adjusted p",
+                            (
+                                f"{result.details['p_adjusted']:.4g}"
+                                if "p_adjusted" in result.details
+                                else "N/A"
+                            ),
+                        )
+                        cards[2].metric(
+                            "Effect size",
+                            (
+                                f"{result.effect_size:.4g}"
                                 if result.effect_size is not None
                                 else "N/A"
                             ),
+                        )
+                        cards[3].metric(
+                            "Conformity", result.details.get("conformity", "N/A")
                         )
                     st.subheader("What stood out")
                     for finding in bundle.findings:
@@ -229,7 +271,7 @@ if df is not None:
                         for result in bundle.results:
                             st.write(*result.caveats)
                 with tabs[1]:
-                    for result in bundle.results:
+                    for i, result in enumerate(bundle.results):
                         if (
                             result.test_name.startswith("benford_")
                             and result.p_value is not None
@@ -243,6 +285,27 @@ if df is not None:
                             st.caption(
                                 "How to read this: compare observed bars with the expected line and shaded range."
                             )
+                            with st.expander("Log-scale, deviation and mantissa views"):
+                                for view, caption in (
+                                    (
+                                        "log",
+                                        "The log scale makes small digit-bin proportions visible.",
+                                    ),
+                                    (
+                                        "deviation",
+                                        "Bars above zero exceed the expected proportion.",
+                                    ),
+                                    (
+                                        "mantissa",
+                                        "Compare the fractional log-magnitudes to uniform density.",
+                                    ),
+                                ):
+                                    key = f"{i}:{view}"
+                                    if key in bundle.figures:
+                                        extra = bundle.figures[key]()
+                                        st.pyplot(extra)
+                                        plt.close(extra)
+                                        st.caption("How to read this: " + caption)
                             st.write(
                                 "MAD:",
                                 result.details["mad"],

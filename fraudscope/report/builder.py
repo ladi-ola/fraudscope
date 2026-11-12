@@ -62,6 +62,14 @@ def build_report(bundle, *, top_n=20):
                         "Compare observed bars with the expected line and reference bounds.",
                     )
                 )
+            if f"{i}:mantissa" in bundle.figures:
+                charts.append(
+                    (
+                        "mantissa",
+                        _image(bundle.figures[f"{i}:mantissa"]()),
+                        "Compare fractional log-magnitudes with the uniform reference.",
+                    )
+                )
         elif name in ("ks_one_sample", "kuiper_one_sample"):
             numbers.update(
                 {

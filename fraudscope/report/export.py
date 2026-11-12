@@ -37,7 +37,9 @@ def html_report(bundle):
 
 
 def findings_json(bundle):
-    return json.dumps(findings_document(bundle.findings), indent=2, allow_nan=False)
+    return json.dumps(
+        findings_document(bundle.findings, bundle.results), indent=2, allow_nan=False
+    )
 
 
 def pdf_report(bundle):

@@ -2,6 +2,7 @@
 
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.stats import norm
 
 from fraudscope.plots import (
     plot_ecdf_vs_reference as _plot_ecdf_vs_reference,
@@ -23,28 +24,36 @@ EXPECTED = "#a34b56"
 FLAGGED = "#d37a32"
 
 
-def digit_figure(result, view="primary"):
-    """Show observed bars against expected line and continuity-corrected 95% band."""
+def digit_figure(result, view="primary", *, confidence=0.95):
+    """Reference band per digit: expected +/- z*binomial SE +/- 0.5/n.
+
+    ``confidence`` controls only the plotted range, never test p-values,
+    Findings, or positional record flags. Bands are per bin, not simultaneous.
+    """
+    if not np.isfinite(confidence) or not 0 < confidence < 1:
+        raise ValueError("Chart band must be a fraction strictly between 0 and 1.")
     d = result.details
     bins = np.asarray(d["bins"])
     observed, expected = np.asarray(d["observed"]), np.asarray(d["expected"])
     x = np.arange(len(bins))
+    critical = norm.ppf((1 + confidence) / 2)
+    sd = np.sqrt(expected * (1 - expected) / max(result.n, 1))
+    margin = critical * sd + 0.5 / max(result.n, 1)
+    lower = np.maximum(0, expected - margin)
+    upper = np.minimum(1, expected + margin)
+    outside = (observed < lower) | (observed > upper)
+    label = f"{confidence:.0%} reference band"
     fig, ax = plt.subplots(figsize=(12, 6.5))
     if view == "deviation":
         ax.bar(
             x,
             observed - expected,
-            color=[FLAGGED if b in d["flagged_bins"] else OBSERVED for b in bins],
+            color=np.where(outside, FLAGGED, OBSERVED),
         )
-        sd = np.sqrt(expected * (1 - expected) / max(result.n, 1))
-        ax.plot(x, 1.96 * sd, "--", color=EXPECTED, label="95% bound")
-        ax.plot(x, -1.96 * sd, "--", color=EXPECTED)
+        ax.plot(x, upper - expected, "--", color=EXPECTED, label=label)
+        ax.plot(x, lower - expected, "--", color=EXPECTED)
         ax.set_ylabel("Seen in data − expected")
     elif view in ("primary", "log"):
-        sd = np.sqrt(expected * (1 - expected) / max(result.n, 1))
-        band = np.maximum(0, expected - 1.96 * sd - 0.5 / max(result.n, 1))
-        upper = expected + 1.96 * sd + 0.5 / max(result.n, 1)
-        outside = (observed < band) | (observed > upper)
         ax.bar(
             x, observed, color=np.where(outside, FLAGGED, OBSERVED), label="Observed"
         )
@@ -57,7 +66,7 @@ def digit_figure(result, view="primary"):
             linewidth=1.2,
             label="Expected",
         )
-        ax.fill_between(x, band, upper, color=EXPECTED, alpha=0.15, label="95% band")
+        ax.fill_between(x, lower, upper, color=EXPECTED, alpha=0.15, label=label)
         if view == "log":
             ax.set_yscale("log")
             ax.set_ylim(bottom=max(1e-5, min(expected) * 0.1))

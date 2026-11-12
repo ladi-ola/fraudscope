@@ -14,6 +14,7 @@ from .figures import (
     score_figure,
     top_records_figure,
 )
+from .metrics import metric_explanation
 from .typography import font_face_css, style_figure
 
 NUMBER_LABELS = {
@@ -32,6 +33,7 @@ NUMBER_LABELS = {
     "positive_orders_span": "Spread of positive values (powers of ten)",
     "ecdf_95_band": "95% sampling-uncertainty guide",
     "conformity": "Digit-pattern label",
+    "reference_band": "Shaded digit-chart band",
     "D_plus": "Largest gap above the reference (D+)",
     "D_minus": "Largest gap below the reference (D-)",
     "x_plus": "Value at the largest upward gap",
@@ -72,6 +74,7 @@ def _image(fig):
 def build_report(bundle, *, top_n=20):
     """Create portable report data; Findings alone supply written readings."""
     sections = []
+    confidence = bundle.run_metadata.get("config", {}).get("benford_band", 0.95)
     for i, result in enumerate(bundle.results):
         if result.p_value is None:
             continue
@@ -104,6 +107,7 @@ def build_report(bundle, *, top_n=20):
             )
         charts = []
         if name.startswith("benford_"):
+            numbers["reference_band"] = f"{confidence:.0%}"
             numbers.update(
                 {
                     key: result.details[key]
@@ -120,8 +124,8 @@ def build_report(bundle, *, top_n=20):
                 charts.append(
                     (
                         view,
-                        _image(digit_figure(result, view)),
-                        "Bars show the data; the line shows what is expected. Look for bars outside the shaded area.",
+                        _image(digit_figure(result, view, confidence=confidence)),
+                        f"The {confidence:.0%} band shows the expected range for each digit. Orange bars are outside it. A narrower band marks more bars on the chart only.",
                     )
                 )
             if f"{i}:mantissa" in bundle.figures:
@@ -184,7 +188,11 @@ def build_report(bundle, *, top_n=20):
                 "title": _title(result),
                 "numbers": numbers,
                 "number_rows": [
-                    (NUMBER_LABELS.get(key, key.replace("_", " ").title()), value)
+                    (
+                        NUMBER_LABELS.get(key, key.replace("_", " ").title()),
+                        value,
+                        metric_explanation(result, key),
+                    )
                     for key, value in numbers.items()
                     if key not in ("bins", "observed", "expected", "z_scores")
                 ],
@@ -206,21 +214,36 @@ def build_report(bundle, *, top_n=20):
                     "reviewed_records": len(ml.flagged_indices),
                 },
                 "number_rows": [
-                    (NUMBER_LABELS["index"], ml.index),
+                    (
+                        NUMBER_LABELS["index"],
+                        ml.index,
+                        metric_explanation(None, "index"),
+                    ),
                     (
                         "Share of records above the review threshold",
                         f"{ml.components['review_share']:.1%}",
+                        metric_explanation(None, "review_share"),
                     ),
                     (
                         "Combined size of differences (0–1)",
                         f"{ml.components['normalized_effect']:.2f}",
+                        metric_explanation(None, "normalized_effect"),
                     ),
                     (
                         "Combined reference-test signal (0–1)",
                         f"{ml.components['adjusted_significance']:.2f}",
+                        metric_explanation(None, "adjusted_significance"),
                     ),
-                    (NUMBER_LABELS["threshold"], ml.threshold),
-                    (NUMBER_LABELS["reviewed_records"], len(ml.flagged_indices)),
+                    (
+                        NUMBER_LABELS["threshold"],
+                        ml.threshold,
+                        metric_explanation(None, "threshold"),
+                    ),
+                    (
+                        NUMBER_LABELS["reviewed_records"],
+                        len(ml.flagged_indices),
+                        metric_explanation(None, "reviewed_records"),
+                    ),
                 ],
                 "charts": [
                     (

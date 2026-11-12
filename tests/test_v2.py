@@ -17,6 +17,7 @@ from sklearn.metrics import roc_auc_score
 from app.theme import CSS
 from fraudscope.applicability import benford_applicable, continuous_applicable
 from fraudscope.findings import FindingsEngine, severity
+from fraudscope.report.builder import build_report
 from fraudscope.report.export import (
     _pdf_image_size,
     findings_json,
@@ -139,6 +140,28 @@ def test_digit_figures(data, mode):
         plt.close(fig)
 
 
+def test_selected_benford_band_is_visual_only(data):
+    narrow = run_analysis(data, Config(["amount"], benford_band=0.40, ml_enabled=False))
+    wide = run_analysis(data, Config(["amount"], benford_band=0.95, ml_enabled=False))
+    assert narrow.results[0].to_dict() == wide.results[0].to_dict()
+    assert narrow.findings == wide.findings
+    for confidence in (0.40, 0.80, 0.90, 0.95):
+        fig = digit_figure(narrow.results[0], confidence=confidence)
+        assert (
+            f"{confidence:.0%} reference band"
+            in fig.axes[0].get_legend_handles_labels()[1]
+        )
+        plt.close(fig)
+    report = build_report(narrow)
+    assert "40% band" in report["sections"][0]["charts"][0][2]
+    assert any(
+        label == "Shaded digit-chart band" and value == "40%"
+        for label, value, _ in report["sections"][0]["number_rows"]
+    )
+    with pytest.raises(ValueError):
+        digit_figure(narrow.results[0], confidence=1)
+
+
 def test_exports_and_wording(data):
     bundle = run_analysis(
         data, Config(["amount"], references={"amount": "benford"}, random_state=7)
@@ -148,6 +171,9 @@ def test_exports_and_wording(data):
         assert marker in html
     assert "What we measured" in html and "How to interpret this report" in html
     assert "Usable numeric values in this column" in html
+    assert (
+        "Average absolute difference between observed and expected digit shares" in html
+    )
     assert "font-family:'Source Code Pro',sans-serif" in html
     assert "font-family:'Source Code Pro',sans-serif" in CSS
     assert b"%PDF" in pdf_report(bundle)[:10]

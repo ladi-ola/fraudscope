@@ -60,6 +60,8 @@ def run_analysis(
     dataset_name: str = "dataset",
 ) -> AnalysisBundle:
     """Run independently isolated tests; later layers consume this bundle."""
+    if not 0 < config.benford_band < 1:
+        raise ValueError("The Benford chart band must be between 0 and 1.")
     start = time.perf_counter()
     profile = profile_dataset(df)
     results = run_all(df, config)
@@ -114,10 +116,14 @@ def run_analysis(
         if result.p_value is None:
             continue
         if result.test_name.startswith("benford_"):
-            bundle.figures[f"{i}:primary"] = partial(digit_figure, result)
-            bundle.figures[f"{i}:log"] = partial(digit_figure, result, "log")
+            bundle.figures[f"{i}:primary"] = partial(
+                digit_figure, result, confidence=config.benford_band
+            )
+            bundle.figures[f"{i}:log"] = partial(
+                digit_figure, result, "log", confidence=config.benford_band
+            )
             bundle.figures[f"{i}:deviation"] = partial(
-                digit_figure, result, "deviation"
+                digit_figure, result, "deviation", confidence=config.benford_band
             )
             if result.column in df:
                 values = pd.to_numeric(df[result.column], errors="coerce").to_numpy(

@@ -125,10 +125,20 @@ def pdf_report(bundle):
         paragraph(
             "A p-value describes how surprising a result would be if the chosen reference were a good match; it is not a probability of wrongdoing. The size of the difference shows how far the data are from that reference."
         )
-        rows = [["Measure", "Value"]] + [
-            [str(label), str(value)[:250]] for label, value in section["number_rows"]
+        rows = [["Measure and meaning", "Value"]] + [
+            [
+                Paragraph(
+                    escape(str(label))
+                    + "<br/><font size='7'>"
+                    + escape(description)
+                    + "</font>",
+                    styles["Normal"],
+                ),
+                Paragraph(escape(str(value)), styles["Normal"]),
+            ]
+            for label, value, description in section["number_rows"]
         ]
-        table = Table(rows, colWidths=[130, 350], repeatRows=1)
+        table = Table(rows, colWidths=[250, 230], repeatRows=1)
         table.setStyle(
             TableStyle(
                 [
@@ -183,7 +193,7 @@ def pdf_report(bundle):
     )
     paragraph("Technical methods and thresholds", "Heading2")
     paragraph(
-        "For n independent finite observations, the conservative 95% Dvoretzky-Kiefer-Wolfowitz ECDF bound is min(1, sqrt(log(40)/(2n))). Positive-value span is log10(max) - log10(min). Benford chi-square results are warned if expected digit counts fall below five; MAD labels follow Nigrini guidelines. KS D and Kuiper V use descriptive scales of 0.2 and 0.3, not universal thresholds. P-values use the method shown in each table and receive Benjamini-Hochberg adjustment across tests. The index is 100 x (0.2 x review share + 0.5 x normalized difference + 0.3 x adjusted reference-test signal)."
+        "The selected Benford chart band is calculated separately for each digit as expected share +/- the normal critical value times the binomial standard error, plus a half-count continuity adjustment. Narrower bands highlight more chart bars, but do not change test results or row flags. For n independent finite observations, the conservative 95% Dvoretzky-Kiefer-Wolfowitz ECDF bound is min(1, sqrt(log(40)/(2n))). Positive-value span is log10(max) - log10(min). Benford chi-square results are warned if expected digit counts fall below five; MAD labels follow Nigrini guidelines. KS D and Kuiper V use descriptive scales of 0.2 and 0.3, not universal thresholds. P-values use the method shown in each table and receive Benjamini-Hochberg adjustment across tests. The index is 100 x (0.2 x review share + 0.5 x normalized difference + 0.3 x adjusted reference-test signal)."
     )
     paragraph("How to reproduce this run", "Heading1")
     paragraph(str(data["metadata"]))

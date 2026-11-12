@@ -21,3 +21,9 @@ def test_sample_smoke():
         "amount",
         "sequence",
     }
+    next(
+        slider for slider in app.slider if slider.label == "Benford chart band (%)"
+    ).set_value(40).run()
+    app.button[1].click().run()
+    assert not app.exception
+    assert app.session_state["bundle"].run_metadata["config"]["benford_band"] == 0.4

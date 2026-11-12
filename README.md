@@ -19,6 +19,10 @@ streamlit run app/main.py
 
 Upload a CSV/XLSX file or choose either built-in sample. Select columns and
 digit modes, optionally compare to Benford log-mantissas, then run the analysis.
+The Benford chart band can be set to any whole-number level from 1% to 99%
+(95% by default). This changes only the shaded range and which bars are
+colored in the chart—not the test numbers, Findings, or flagged records. The
+band applies to each digit separately, not all digits at once.
 HTML, PDF and schema-versioned `findings.json` are available from the Report tab.
 **Screenshots:** placeholder (capture the app's Overview and Report tabs).
 The app, charts, and offline reports use bundled Source Code Pro (Adobe, SIL

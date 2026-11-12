@@ -16,12 +16,12 @@ from app.theme import CSS
 from fraudscope.applicability import benford_applicable
 from fraudscope.report.export import findings_json, html_report, pdf_report
 from fraudscope.report.figures import (
-    digit_figure,
     plot_ecdf_vs_reference,
     plot_group_residuals,
     plot_residuals,
     score_figure,
 )
+from fraudscope.report.metrics import metric_explanation
 from fraudscope.runner import Config, RegressionSpec
 from fraudscope.service import profile_dataset, run_analysis
 
@@ -33,6 +33,12 @@ def analyze(data, config_json, digest, name):
     if options.get("regression"):
         options["regression"] = RegressionSpec(**options["regression"])
     return run_analysis(data, Config(**options), data_hash=digest, dataset_name=name)
+
+
+@st.cache_data(show_spinner=False)
+def cached_exports(digest, config_json, name, _bundle):
+    """Build downloads once per data/config/name, not on every widget rerun."""
+    return html_report(_bundle), pdf_report(_bundle), findings_json(_bundle)
 
 
 def sample_data(injected=False):
@@ -54,12 +60,14 @@ uploaded = st.file_uploader("Upload CSV or XLSX", type=["csv", "xlsx"])
 sample_choice = st.selectbox(
     "Or try sample data", ["None", "Expected digit distribution", "Injected deviations"]
 )
-if st.button("Try with sample data"):
-    st.session_state["use_sample"] = True
+sample_clicked = st.button("Try with sample data")
+if sample_clicked:
+    st.session_state["sample_active"] = True
 df = None
 name = "sample"
 raw = None
 if uploaded is not None:
+    st.session_state["sample_active"] = False
     name = uploaded.name
     raw = uploaded.getvalue()
     if not raw:
@@ -73,7 +81,7 @@ if uploaded is not None:
             )
         except (ValueError, UnicodeError, pd.errors.ParserError, OSError) as exc:
             st.error(f"Could not read the file: {exc}")
-elif sample_choice != "None" or st.session_state.get("use_sample"):
+elif sample_choice != "None" or st.session_state.get("sample_active"):
     df = sample_data(sample_choice == "Injected deviations")
     name = (
         "injected-sample"
@@ -150,6 +158,10 @@ if df is not None:
                     ["first", "second", "first_two", "last_two"],
                     default=["first"],
                 )
+                band_percent = st.slider("Benford chart band (%)", 1, 99, 95)
+                st.caption(
+                    "A narrower band colors more bars for visual review. It does not change test results or row flags."
+                )
                 reference = st.selectbox(
                     "KS / Kuiper reference", ["None", "Benford mantissas"]
                 )
@@ -174,8 +186,7 @@ if df is not None:
                 ml_enabled = st.checkbox("Anomaly scoring", value=True)
                 seed = st.number_input("Random seed", value=17, step=1)
             if (
-                st.button("Run analysis", type="primary")
-                or st.session_state.pop("use_sample", False)
+                st.button("Run analysis", type="primary") or sample_clicked
             ) and columns:
                 from dataclasses import asdict
 
@@ -193,6 +204,7 @@ if df is not None:
                     regression=regression,
                     random_state=int(seed),
                     ml_enabled=ml_enabled,
+                    benford_band=band_percent / 100,
                 )
                 digest = hashlib.sha256(
                     raw
@@ -259,6 +271,7 @@ if df is not None:
                                 else str(result.statistic)
                             ),
                         )
+                        cards[0].caption(metric_explanation(result, "statistic"))
                         cards[1].metric(
                             "Adjusted p",
                             (
@@ -267,6 +280,7 @@ if df is not None:
                                 else "N/A"
                             ),
                         )
+                        cards[1].caption(metric_explanation(result, "adjusted_p"))
                         cards[2].metric(
                             "Effect size",
                             (
@@ -275,8 +289,17 @@ if df is not None:
                                 else "N/A"
                             ),
                         )
+                        cards[2].caption(metric_explanation(result, "effect_size"))
+                        digit_result = result.test_name.startswith("benford_")
                         cards[3].metric(
-                            "Conformity", result.details.get("conformity", "N/A")
+                            "Digit-pattern label" if digit_result else "p-value method",
+                            result.details.get("conformity", result.p_value_method),
+                        )
+                        cards[3].caption(
+                            metric_explanation(
+                                result,
+                                "conformity" if digit_result else "p_value_method",
+                            )
                         )
                     st.subheader("What stood out")
                     for finding in bundle.findings:
@@ -291,13 +314,13 @@ if df is not None:
                             and result.p_value is not None
                         ):
                             st.subheader(f"{result.column} · {result.details['mode']}")
-                            fig = digit_figure(result)
+                            fig = bundle.figures[f"{i}:primary"]()
                             st.pyplot(fig)
                             import matplotlib.pyplot as plt
 
                             plt.close(fig)
                             st.caption(
-                                "How to read this: compare observed bars with the expected line and shaded range."
+                                f"How to read this: the {bundle.run_metadata['config'].get('benford_band', .95):.0%} band is a visual range for each digit. Orange bars fall outside it; a narrower band colors more bars without changing test results."
                             )
                             with st.expander("Log-scale, deviation and mantissa views"):
                                 for view, caption in (
@@ -326,6 +349,7 @@ if df is not None:
                                 "·",
                                 result.details["conformity"],
                             )
+                            st.caption(metric_explanation(result, "effect_size"))
                             st.dataframe(
                                 pd.DataFrame(
                                     {
@@ -364,6 +388,8 @@ if df is not None:
                                 "· method:",
                                 result.p_value_method,
                             )
+                            st.caption(metric_explanation(result, "statistic"))
+                            st.caption(metric_explanation(result, "p_value"))
                 with tabs[3]:
                     for result in bundle.results:
                         if (
@@ -384,6 +410,10 @@ if df is not None:
                                     for k in ("r_squared", "breusch_pagan", "normality")
                                 }
                             )
+                            for key in ("r_squared", "breusch_pagan", "normality"):
+                                st.caption(
+                                    f"{key.replace('_', ' ').title()}: {metric_explanation(result, key)}"
+                                )
                             st.write("Flagged rows:", result.flagged_indices[:30])
                             if "groups" in result.details:
                                 fig = plot_group_residuals(result)
@@ -403,6 +433,7 @@ if df is not None:
                         st.caption(
                             "How to read this: higher ranks are unusual relative to other rows here."
                         )
+                        st.caption(metric_explanation(None, "index"))
                         st.dataframe(
                             pd.DataFrame(
                                 {
@@ -420,21 +451,30 @@ if df is not None:
                 with tabs[5]:
                     render_flagged_records(df, bundle)
                 with tabs[6]:
+                    config_json = json.dumps(
+                        bundle.run_metadata["config"], sort_keys=True
+                    )
+                    html, pdf, findings = cached_exports(
+                        bundle.run_metadata["sha256"],
+                        config_json,
+                        bundle.run_metadata["dataset_name"],
+                        bundle,
+                    )
                     st.download_button(
                         "Download HTML",
-                        html_report(bundle),
+                        html,
                         "analysis.html",
                         "text/html",
                     )
                     st.download_button(
                         "Download PDF",
-                        pdf_report(bundle),
+                        pdf,
                         "analysis.pdf",
                         "application/pdf",
                     )
                     st.download_button(
                         "Download findings.json",
-                        findings_json(bundle),
+                        findings,
                         "findings.json",
                         "application/json",
                     )

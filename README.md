@@ -21,6 +21,9 @@ Upload a CSV/XLSX file or choose either built-in sample. Select columns and
 digit modes, optionally compare to Benford log-mantissas, then run the analysis.
 HTML, PDF and schema-versioned `findings.json` are available from the Report tab.
 **Screenshots:** placeholder (capture the app's Overview and Report tabs).
+The app, charts, and offline reports use bundled Source Code Pro (Adobe, SIL
+Open Font License 1.1); the font license is at
+`fraudscope/report/fonts/LICENSE.md`. Sans-serif is the fallback typeface.
 
 Architecture:
 

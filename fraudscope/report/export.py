@@ -8,6 +8,8 @@ from jinja2 import BaseLoader, Environment
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.utils import ImageReader
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import (
     Image,
     Paragraph,
@@ -20,6 +22,7 @@ from reportlab.platypus import (
 from fraudscope.findings import findings_document
 
 from .builder import build_report
+from .typography import font_path
 
 
 def _pdf_image_size(image_width, image_height, max_width=480, max_height=650):
@@ -56,7 +59,17 @@ def pdf_report(bundle):
     data = build_report(bundle)
     output = io.BytesIO()
     doc = SimpleDocTemplate(output, pagesize=(595, 842), leftMargin=42, rightMargin=42)
+    bundled = font_path().is_file() and font_path(True).is_file()
+    if bundled and "SourceCodePro" not in pdfmetrics.getRegisteredFontNames():
+        pdfmetrics.registerFont(TTFont("SourceCodePro", str(font_path())))
+        pdfmetrics.registerFont(TTFont("SourceCodePro-Bold", str(font_path(True))))
+    regular_font = "SourceCodePro" if bundled else "Helvetica"
+    bold_font = "SourceCodePro-Bold" if bundled else "Helvetica-Bold"
     styles = getSampleStyleSheet()
+    for name in ("Normal", "BodyText"):
+        styles[name].fontName = regular_font
+    for name in ("Title", "Heading1", "Heading2", "Heading3"):
+        styles[name].fontName = bold_font
     story = []
 
     def paragraph(text, style="Normal"):
@@ -123,6 +136,8 @@ def pdf_report(bundle):
                     ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
                     ("VALIGN", (0, 0), (-1, -1), "TOP"),
                     ("FONTSIZE", (0, 0), (-1, -1), 7),
+                    ("FONTNAME", (0, 0), (-1, -1), regular_font),
+                    ("FONTNAME", (0, 0), (-1, 0), bold_font),
                 ]
             )
         )
@@ -145,6 +160,8 @@ def pdf_report(bundle):
                     [
                         ("VALIGN", (0, 0), (-1, -1), "TOP"),
                         ("FONTSIZE", (0, 0), (-1, -1), 8),
+                        ("FONTNAME", (0, 0), (-1, -1), regular_font),
+                        ("FONTNAME", (0, 0), (-1, 0), bold_font),
                     ]
                 )
             )

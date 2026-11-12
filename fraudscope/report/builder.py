@@ -14,6 +14,7 @@ from .figures import (
     score_figure,
     top_records_figure,
 )
+from .typography import font_face_css, style_figure
 
 NUMBER_LABELS = {
     "n": "Records used in this check (n)",
@@ -62,7 +63,7 @@ def _title(result):
 def _image(fig):
     buffer = io.BytesIO()
     try:
-        fig.savefig(buffer, format="png", dpi=200, bbox_inches="tight")
+        style_figure(fig).savefig(buffer, format="png", dpi=200, bbox_inches="tight")
         return base64.b64encode(buffer.getvalue()).decode("ascii")
     finally:
         plt.close(fig)
@@ -250,6 +251,7 @@ def build_report(bundle, *, top_n=20):
         :10
     ]
     return {
+        "font_css": font_face_css(),
         "metadata": bundle.run_metadata,
         "profile": bundle.dataset_profile,
         "cover": cover,

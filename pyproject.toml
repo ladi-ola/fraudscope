@@ -25,7 +25,7 @@ packages = ["fraudscope", "fraudscope.ml", "fraudscope.report", "benford"]
 package-dir = {"benford" = "benford_py/benford"}
 
 [tool.setuptools.package-data]
-"fraudscope.report" = ["templates/*.j2"]
+"fraudscope.report" = ["templates/*.j2", "fonts/*.ttf", "fonts/LICENSE.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "benford_py/tests"]

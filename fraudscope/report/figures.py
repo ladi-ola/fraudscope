@@ -4,11 +4,19 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from fraudscope.plots import (
-    plot_ecdf_vs_reference,
-    plot_group_residuals,
-    plot_residuals,
-    plot_summary_dashboard,
+    plot_ecdf_vs_reference as _plot_ecdf_vs_reference,
 )
+from fraudscope.plots import (
+    plot_group_residuals as _plot_group_residuals,
+)
+from fraudscope.plots import (
+    plot_residuals as _plot_residuals,
+)
+from fraudscope.plots import (
+    plot_summary_dashboard as _plot_summary_dashboard,
+)
+
+from .typography import style_figure
 
 OBSERVED = "#287d9b"
 EXPECTED = "#a34b56"
@@ -67,7 +75,7 @@ def digit_figure(result, view="primary"):
     )
     ax.legend(loc="best")
     fig.tight_layout()
-    return fig
+    return style_figure(fig)
 
 
 def mantissa_figure(values):
@@ -85,7 +93,7 @@ def mantissa_figure(values):
     )
     ax.legend()
     fig.tight_layout()
-    return fig
+    return style_figure(fig)
 
 
 def score_figure(scores, threshold=0.9):
@@ -100,7 +108,7 @@ def score_figure(scores, threshold=0.9):
     )
     ax.legend()
     fig.tight_layout()
-    return fig
+    return style_figure(fig)
 
 
 def top_records_figure(scores, contributions, n=10):
@@ -120,7 +128,23 @@ def top_records_figure(scores, contributions, n=10):
         xlabel="Relative anomaly score", xlim=(0, 1.3), title="Top records to review"
     )
     fig.tight_layout()
-    return fig
+    return style_figure(fig)
+
+
+def plot_ecdf_vs_reference(result, save_path=None):
+    return style_figure(_plot_ecdf_vs_reference(result, save_path))
+
+
+def plot_group_residuals(result, save_path=None):
+    return style_figure(_plot_group_residuals(result, save_path))
+
+
+def plot_residuals(result, save_path=None):
+    return style_figure(_plot_residuals(result, save_path))
+
+
+def plot_summary_dashboard(results, save_path=None):
+    return style_figure(_plot_summary_dashboard(results, save_path))
 
 
 __all__ = [

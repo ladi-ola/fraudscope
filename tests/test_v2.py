@@ -11,8 +11,10 @@ import numpy as np
 import pandas as pd
 import pytest
 from matplotlib.figure import Figure
+from reportlab.pdfbase import pdfmetrics
 from sklearn.metrics import roc_auc_score
 
+from app.theme import CSS
 from fraudscope.applicability import benford_applicable, continuous_applicable
 from fraudscope.findings import FindingsEngine, severity
 from fraudscope.report.export import (
@@ -22,6 +24,7 @@ from fraudscope.report.export import (
     pdf_report,
 )
 from fraudscope.report.figures import digit_figure
+from fraudscope.report.typography import font_path
 from fraudscope.runner import Config, RegressionSpec
 from fraudscope.service import run_analysis
 
@@ -128,6 +131,7 @@ def test_digit_figures(data, mode):
         assert isinstance(fig, Figure)
         assert fig.get_size_inches()[0] == pytest.approx(12)
         assert fig.get_size_inches()[1] == pytest.approx(6.5)
+        assert fig.axes[0].title.get_fontproperties().get_file() == str(font_path(True))
         if view == "primary":
             assert fig.axes[0].patches and fig.axes[0].lines
         if view == "log":
@@ -144,7 +148,10 @@ def test_exports_and_wording(data):
         assert marker in html
     assert "What we measured" in html and "How to interpret this report" in html
     assert "Usable numeric values in this column" in html
+    assert "font-family:'Source Code Pro',sans-serif" in html
+    assert "font-family:'Source Code Pro',sans-serif" in CSS
     assert b"%PDF" in pdf_report(bundle)[:10]
+    assert "SourceCodePro" in pdfmetrics.getRegisteredFontNames()
     assert json.loads(findings_json(bundle))["schema_version"] == "1.0"
     for text in (html, findings_json(bundle)):
         assert not any(

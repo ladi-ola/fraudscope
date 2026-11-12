@@ -11,10 +11,14 @@ dependencies = ["numpy", "pandas", "scipy", "statsmodels", "matplotlib", "openpy
 
 [project.optional-dependencies]
 dev = ["pytest", "nbformat", "ruff", "black", "astropy"]
+app = ["streamlit>=1.40,<2", "scikit-learn>=1.5,<2", "jinja2>=3.1,<4", "reportlab>=4,<5"]
 
 [tool.setuptools]
-packages = ["fraudscope", "benford"]
+packages = ["fraudscope", "fraudscope.ml", "fraudscope.report", "benford"]
 package-dir = {"benford" = "benford_py/benford"}
+
+[tool.setuptools.package-data]
+"fraudscope.report" = ["templates/*.j2"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "benford_py/tests"]

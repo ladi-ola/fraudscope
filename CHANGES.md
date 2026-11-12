@@ -31,3 +31,13 @@ v2 additive v1-module change:
 - `fraudscope/runner.py`: append `Config.ml_enabled=True` so the new service can
   offer optional ranking. `run_all`, existing positional arguments and
   statistical outputs retain their v1 behavior; no upstream files changed.
+
+Follow-up user-requested change to v1 applicability:
+- `fraudscope/applicability.py`: remove fixed 30/300/1000 observation and
+  three-order-of-magnitude suitability cutoffs. Structural problems (no
+  eligible values, constant data, conspicuous repetition/rounding/identifiers)
+  still warn, and tests still execute independently. Strict callers with a
+  small but otherwise eligible sample now proceed rather than raising. Reports
+  carry observed counts, ranges and sampling-uncertainty guidance instead.
+- `fraudscope/regression.py`: remove the advisory 30-row cutoff; the model
+  still requires the mathematically necessary residual degrees of freedom.

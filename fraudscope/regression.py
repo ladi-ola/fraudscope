@@ -38,10 +38,8 @@ def regression_test(
     frame["_position"] = np.arange(len(frame))
     frame = frame.dropna(subset=[y, *x])
     warnings = []
-    if len(frame) < max(30, len(x) + 3):
-        warnings.append("Small sample relative to model complexity.")
-    if strict and warnings:
-        raise ValueError(" ".join(warnings))
+    # Only require the residual degrees of freedom needed by diagnostics.
+    # Report the observed n and assumptions instead of an arbitrary n cutoff.
     if len(frame) <= len(x) + 2:
         raise ValueError("Insufficient complete rows for regression diagnostics.")
     exog = sm.add_constant(frame[x].astype(float), has_constant="add")

@@ -33,6 +33,7 @@ class Config:
     top_k: int = 3
     decimals: int = 2
     ml_enabled: bool = True
+    benford_band: float = 0.95
 
 
 def run_all(df: pd.DataFrame, config: Config) -> list[TestResult]:

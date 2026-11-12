@@ -41,3 +41,8 @@ Follow-up user-requested change to v1 applicability:
   carry observed counts, ranges and sampling-uncertainty guidance instead.
 - `fraudscope/regression.py`: remove the advisory 30-row cutoff; the model
   still requires the mathematically necessary residual degrees of freedom.
+
+v2 chart configuration (additive v1 dataclass change):
+- `fraudscope/runner.py`: append `Config.benford_band=0.95` for the selected
+  visual reference band in the app and report. This does not change v1 test
+  results, flags, p-values, or existing positional Config arguments.

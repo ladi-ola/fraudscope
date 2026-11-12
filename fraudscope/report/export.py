@@ -22,6 +22,12 @@ from fraudscope.findings import findings_document
 from .builder import build_report
 
 
+def _pdf_image_size(image_width, image_height, max_width=480, max_height=650):
+    """Fit report figures on one PDF page while preserving their proportions."""
+    scale = min(max_width / image_width, max_height / image_height)
+    return image_width * scale, image_height * scale
+
+
 def html_report(bundle):
     """Render a self-contained HTML report from structured numerical sections."""
     template = (
@@ -61,13 +67,16 @@ def pdf_report(bundle):
         raw = io.BytesIO(base64.b64decode(encoded))
         reader = ImageReader(raw)
         w, h = reader.getSize()
-        story.append(Image(raw, width=width, height=width * h / w))
+        display_width, display_height = _pdf_image_size(w, h, max_width=width)
+        story.append(Image(raw, width=display_width, height=display_height))
 
     paragraph("Statistical anomaly analysis", "Title")
     paragraph(
         f"Dataset: {data['metadata']['dataset_name']} · {data['metadata']['timestamp']}"
     )
-    paragraph("Results indicate statistical anomalies, not proof of wrongdoing.")
+    paragraph(
+        "Patterns in this report are worth reviewing, not proof of wrongdoing. Scores rank records within this dataset; they are not probabilities."
+    )
     paragraph(
         f"Anomaly index: {data['index']} / 100 (relative indicator, not a probability)"
         if data["index"] is not None
@@ -75,21 +84,36 @@ def pdf_report(bundle):
     )
     if data["scoring_warning"]:
         paragraph("Scoring note: " + data["scoring_warning"])
-    paragraph(f"Components: {data['components']}")
+    if data["components"]:
+        parts = data["components"]
+        paragraph(
+            f"Index breakdown: {parts['review_share']:.1%} of records above the review score; combined size of differences {parts['normalized_effect']:.2f}/1; combined reference-test signal {parts['adjusted_significance']:.2f}/1."
+        )
     picture(data["cover"])
-    paragraph("Executive summary", "Heading1")
+    paragraph("Main points", "Heading1")
     for finding in data["summary"]:
         paragraph(f"{finding.severity}: {finding.statement}")
-    paragraph("Dataset profile and applicability", "Heading1")
+    paragraph("About the dataset", "Heading1")
     paragraph(
-        "No fixed sample-size minimum applies. The profile gives eligible counts and observed value ranges. Smaller counts imply wider uncertainty; narrow ranges can limit the meaning of digit comparisons. The conservative 95% ECDF uncertainty bound is min(1, sqrt(log(40)/(2n))) for n independent finite observations, not a fitted-reference p-value."
+        "There is no fixed minimum number of rows. With fewer usable values, results are less precise. A narrow value range can make digit patterns less informative."
     )
-    paragraph(str(data["profile"]))
+    paragraph(
+        f"{data['profile']['rows']} rows and {data['profile']['columns']} columns."
+    )
+    for name, profile in data["profile"]["column_profiles"].items():
+        paragraph(
+            f"{name}: {profile.get('finite_count', 'Unavailable')} usable numbers; {profile.get('positive_count', 'Unavailable')} positive; {profile['missing']} missing. Values range from {profile.get('finite_min')} to {profile.get('finite_max')}. Positive values range from {profile.get('positive_min')} to {profile.get('positive_max')} ({profile.get('positive_orders_span')} powers of ten). Sampling-uncertainty guide: +/- {profile.get('ecdf_95_band')}. Digit check: {profile['benford']}; reference check: {profile['continuous']}."
+        )
+        for reason in profile["benford_reasons"] + profile["continuous_reasons"]:
+            paragraph("Keep in mind: " + reason)
     for section in data["sections"]:
         paragraph(section["title"], "Heading1")
-        paragraph("NUMBERS", "Heading2")
-        rows = [["Metric", "Value"]] + [
-            [str(k), str(v)[:250]] for k, v in section["numbers"].items()
+        paragraph("NUMBERS - What we measured", "Heading2")
+        paragraph(
+            "A p-value describes how surprising a result would be if the chosen reference were a good match; it is not a probability of wrongdoing. The size of the difference shows how far the data are from that reference."
+        )
+        rows = [["Measure", "Value"]] + [
+            [str(label), str(value)[:250]] for label, value in section["number_rows"]
         ]
         table = Table(rows, colWidths=[130, 350], repeatRows=1)
         table.setStyle(
@@ -103,20 +127,48 @@ def pdf_report(bundle):
             )
         )
         story.append(table)
-        paragraph("CHART", "Heading2")
+        if "bins" in section["numbers"]:
+            numbers = section["numbers"]
+            detail_rows = [["Digit", "Seen in data", "Expected", "Difference (z)"]]
+            detail_rows += [
+                [str(digit), f"{observed:.2%}", f"{expected:.2%}", f"{z:.2f}"]
+                for digit, observed, expected, z in zip(
+                    numbers["bins"],
+                    numbers["observed"],
+                    numbers["expected"],
+                    numbers["z_scores"],
+                )
+            ]
+            detail = Table(detail_rows, colWidths=[60, 130, 130, 130], repeatRows=1)
+            detail.setStyle(
+                TableStyle(
+                    [
+                        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                        ("FONTSIZE", (0, 0), (-1, -1), 8),
+                    ]
+                )
+            )
+            story.append(detail)
+        paragraph("CHART - What the pictures show", "Heading2")
         for _, image, caption in section["charts"]:
             picture(image)
             paragraph("How to read this: " + caption)
-        paragraph("STATISTICAL READING", "Heading2")
+        paragraph("STATISTICAL READING - What this may mean", "Heading2")
         for reading in section["reading"] + section["caveats"]:
             paragraph(reading)
-    paragraph("Flagged-records appendix", "Heading1")
-    paragraph(str(data["flagged_rows"]))
-    paragraph("Methodology and limitations", "Heading1")
+    paragraph("Rows to review", "Heading1")
     paragraph(
-        "There is no fixed row-count or magnitude-span eligibility threshold. The uncertainty bound decreases with the number of independent observations. Benford chi-square calibration is unreliable if expected bin counts fall below five, and results are warned rather than suppressed. Benford MAD uses Nigrini descriptive cutoffs; KS D and Kuiper V use descriptive design scales of 0.2 and 0.3, not universal critical values. P-values may be asymptotic or Monte Carlo; valid run p-values use Benjamini-Hochberg adjustment. Isolation Forest is unsupervised and scores are within-dataset ranks. The index is 100 × (0.2 × review share + 0.5 × normalized distribution effect + 0.3 × adjusted significance)."
+        "Zero-based row positions in the uploaded data: " + str(data["flagged_rows"])
     )
-    paragraph("Reproducibility", "Heading1")
+    paragraph("How to interpret this report", "Heading1")
+    paragraph(
+        "Digit checks compare shares of each digit with a reference pattern. Distribution checks compare the overall shape of the data with a chosen reference. A relationship check compares observed values with model predictions. Scores rank unusual records only within this dataset. Smaller samples and rounding can affect results."
+    )
+    paragraph("Technical methods and thresholds", "Heading2")
+    paragraph(
+        "For n independent finite observations, the conservative 95% Dvoretzky-Kiefer-Wolfowitz ECDF bound is min(1, sqrt(log(40)/(2n))). Positive-value span is log10(max) - log10(min). Benford chi-square results are warned if expected digit counts fall below five; MAD labels follow Nigrini guidelines. KS D and Kuiper V use descriptive scales of 0.2 and 0.3, not universal thresholds. P-values use the method shown in each table and receive Benjamini-Hochberg adjustment across tests. The index is 100 x (0.2 x review share + 0.5 x normalized difference + 0.3 x adjusted reference-test signal)."
+    )
+    paragraph("How to reproduce this run", "Heading1")
     paragraph(str(data["metadata"]))
     paragraph("Packages: " + str(data["metadata"]["package_versions"]))
     doc.build(story)

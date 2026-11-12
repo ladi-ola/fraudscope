@@ -15,7 +15,12 @@ from sklearn.metrics import roc_auc_score
 
 from fraudscope.applicability import benford_applicable, continuous_applicable
 from fraudscope.findings import FindingsEngine, severity
-from fraudscope.report.export import findings_json, html_report, pdf_report
+from fraudscope.report.export import (
+    _pdf_image_size,
+    findings_json,
+    html_report,
+    pdf_report,
+)
 from fraudscope.report.figures import digit_figure
 from fraudscope.runner import Config, RegressionSpec
 from fraudscope.service import run_analysis
@@ -53,7 +58,7 @@ def test_tiny_missing_and_constant():
     )
     assert constant.ml_output.warning
     single = run_analysis(pd.DataFrame({"amount": [7.0]}), Config(["amount"]))
-    assert "Anomaly index: Not available" in html_report(single)
+    assert "Overall anomaly index: Not available" in html_report(single)
     assert pdf_report(single).startswith(b"%PDF")
 
 
@@ -70,7 +75,7 @@ def test_no_fixed_minimum_and_reported_sample_scale():
     assert profile["ecdf_95_band"] == pytest.approx(np.sqrt(np.log(40) / 4))
     assert bundle.results[0].n == 2 and bundle.results[0].p_value is not None
     html = html_report(bundle)
-    assert "2 finite numeric values" in html
+    assert "2 usable numbers" in html
     assert "400.0" in html and "uncertainty" in html
     assert pdf_report(bundle).startswith(b"%PDF")
 
@@ -121,6 +126,8 @@ def test_digit_figures(data, mode):
     for view in ("primary", "log", "deviation"):
         fig = digit_figure(result, view)
         assert isinstance(fig, Figure)
+        assert fig.get_size_inches()[0] == pytest.approx(12)
+        assert fig.get_size_inches()[1] == pytest.approx(6.5)
         if view == "primary":
             assert fig.axes[0].patches and fig.axes[0].lines
         if view == "log":
@@ -135,12 +142,20 @@ def test_exports_and_wording(data):
     html = html_report(bundle)
     for marker in ("NUMBERS", "CHART", "STATISTICAL READING", "data:image/png;base64"):
         assert marker in html
+    assert "What we measured" in html and "How to interpret this report" in html
+    assert "Usable numeric values in this column" in html
     assert b"%PDF" in pdf_report(bundle)[:10]
     assert json.loads(findings_json(bundle))["schema_version"] == "1.0"
     for text in (html, findings_json(bundle)):
         assert not any(
             word in text.lower() for word in ("fraudulent", "rigged", "fraud")
         )
+
+
+def test_tall_dashboard_fits_pdf_page():
+    width, height = _pdf_image_size(900, 2000)
+    assert height <= 650 and width <= 480
+    assert width / height == pytest.approx(900 / 2000)
 
 
 def test_ml_ablation_metrics(data, capsys):

@@ -54,7 +54,7 @@ class FindingsEngine:
                         high,
                         "above" if mad >= high else "below",
                         severity(mad, low, high),
-                        f"{column}: MAD {mad:.4f}; conformity {label}; n={result.n}.",
+                        f"For {column}, the average gap from the expected digit pattern is {mad:.4f} (MAD). The guideline label is {label}, based on {result.n} values.",
                         caveats,
                         f"{i}:primary",
                     )
@@ -76,7 +76,7 @@ class FindingsEngine:
                                 1.96,
                                 "above",
                                 severity(float(z), 1.96, 3),
-                                f"{column} digit {bin_}: observed {observed:.2%}, expected {expected:.2%}, z={z:.2f}.",
+                                f"For {column}, digit {bin_} appears in {observed:.2%} of values, compared with {expected:.2%} expected (standardized difference {z:.2f}).",
                                 caveats,
                                 f"{i}:primary",
                             )
@@ -100,7 +100,7 @@ class FindingsEngine:
                         bound,
                         "above" if value >= bound else "below",
                         severity(value, bound / 2, bound),
-                        f"{column}: {metric}={value:.4f} near value {loc:.4g}; p={result.p_value:.4g} ({result.p_value_method}); n={result.n}.",
+                        f"For {column}, the largest distribution difference is {value:.4f} ({metric}) around value {loc:.4g}. The p-value is {result.p_value:.4g} (calculated using {result.p_value_method}), from {result.n} values.",
                         caveats,
                         f"{i}:ecdf",
                     )
@@ -117,7 +117,7 @@ class FindingsEngine:
                         0.1,
                         "above" if rate >= 0.1 else "below",
                         severity(rate, 0.05, 0.1),
-                        f"{column}: R²={result.details['r_squared']:.4f}; {len(result.flagged_indices)}/{result.n} rows ({rate:.1%}) flagged by diagnostics.",
+                        f"For {column}, the fitted relationship explains {result.details['r_squared']:.4f} of the variation (R²); {len(result.flagged_indices)} of {result.n} rows ({rate:.1%}) were marked for a closer look.",
                         caveats,
                         f"{i}:residuals",
                     )
@@ -134,7 +134,7 @@ class FindingsEngine:
                             0.05,
                             "below" if p < 0.05 else "above",
                             "notable" if p < 0.05 else "info",
-                            f"{column}: {check.replace('_', ' ')} diagnostic p={p:.4g} (reference 0.05).",
+                            f"For {column}, the {check.replace('_', ' ')} check gives a p-value of {p:.4g}, compared with 0.05 as a review guideline.",
                             caveats,
                             f"{i}:residuals",
                         )
@@ -152,7 +152,7 @@ class FindingsEngine:
                             0.0,
                             "above" if mean > 0 else "below",
                             "notable",
-                            f"{column} group {group}: mean residual {mean:.4g} across {item['n']} rows exceeds the exploratory group bound.",
+                            f"For {column}, group {group} differs from the model prediction by an average of {mean:.4g} across {item['n']} rows; this is worth checking in context.",
                             caveats,
                             f"{i}:groups",
                         )
@@ -169,7 +169,7 @@ class FindingsEngine:
                     ml_output.threshold,
                     "above" if share >= ml_output.threshold else "below",
                     "info",
-                    f"{len(ml_output.flagged_indices)} records ({share:.1%}) score at or above {ml_output.threshold:.2f}; dataset index {ml_output.index:.2f}/100 (relative, not a probability).",
+                    f"{len(ml_output.flagged_indices)} records ({share:.1%}) have a relative score of at least {ml_output.threshold:.2f}. The overall index is {ml_output.index:.2f}/100; neither number is a probability.",
                     ["ml:ranking"],
                     "ml:scores",
                 )
@@ -190,7 +190,7 @@ class FindingsEngine:
                         0.0,
                         "above",
                         "info",
-                        f"Feature {feature} appeared among the top three contributors for {count} reviewed records.",
+                        f"The measurement {feature} stood out for {count} reviewed records.",
                         ["ml:ranking"],
                         "ml:scores",
                     )

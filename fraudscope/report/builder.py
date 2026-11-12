@@ -15,6 +15,49 @@ from .figures import (
     top_records_figure,
 )
 
+NUMBER_LABELS = {
+    "n": "Records used in this check (n)",
+    "statistic": "Test result (statistic)",
+    "p_value": "Result relative to the reference (p-value)",
+    "p_value_method": "How the p-value was calculated",
+    "adjusted_p": "P-value after accounting for multiple checks",
+    "effect_size": "Size of the difference (effect size)",
+    "finite_count": "Usable numeric values in this column",
+    "positive_count": "Positive values in this column",
+    "finite_min": "Smallest usable value",
+    "finite_max": "Largest usable value",
+    "positive_min": "Smallest positive value",
+    "positive_max": "Largest positive value",
+    "positive_orders_span": "Spread of positive values (powers of ten)",
+    "ecdf_95_band": "95% sampling-uncertainty guide",
+    "conformity": "Digit-pattern label",
+    "D_plus": "Largest gap above the reference (D+)",
+    "D_minus": "Largest gap below the reference (D-)",
+    "x_plus": "Value at the largest upward gap",
+    "x_minus": "Value at the largest downward gap",
+    "r_squared": "Share of variation explained by the model (R²)",
+    "adj_r_squared": "Model fit adjusted for predictors",
+    "breusch_pagan": "Check for changing error spread",
+    "normality": "Check of error shape",
+    "flagged_rows": "Rows marked for review",
+    "index": "Overall relative anomaly index",
+    "components": "What goes into the index",
+    "threshold": "Record-review score threshold",
+    "reviewed_records": "Records above the review threshold",
+}
+
+
+def _title(result):
+    if result.test_name.startswith("benford_"):
+        return f"Benford {result.details['mode'].replace('_', ' ')} digits · {result.column}"
+    if result.test_name == "ks_one_sample":
+        return f"Distribution comparison (KS) · {result.column}"
+    if result.test_name == "kuiper_one_sample":
+        return f"Distribution comparison (Kuiper) · {result.column}"
+    if result.test_name == "regression":
+        return f"Relationship and unusual rows · {result.column}"
+    return f"{result.test_name.replace('_', ' ').title()} · {result.column}"
+
 
 def _image(fig):
     buffer = io.BytesIO()
@@ -77,7 +120,7 @@ def build_report(bundle, *, top_n=20):
                     (
                         view,
                         _image(digit_figure(result, view)),
-                        "Compare observed bars with the expected line and reference bounds.",
+                        "Bars show the data; the line shows what is expected. Look for bars outside the shaded area.",
                     )
                 )
             if f"{i}:mantissa" in bundle.figures:
@@ -85,7 +128,7 @@ def build_report(bundle, *, top_n=20):
                     (
                         "mantissa",
                         _image(bundle.figures[f"{i}:mantissa"]()),
-                        "Compare fractional log-magnitudes with the uniform reference.",
+                        "Compare how often values occur across the log-scaled range with the flat reference line.",
                     )
                 )
         elif name in ("ks_one_sample", "kuiper_one_sample"):
@@ -99,7 +142,7 @@ def build_report(bundle, *, top_n=20):
                 (
                     "ecdf",
                     _image(plot_ecdf_vs_reference(result)),
-                    "Compare the sample's cumulative curve with its reference.",
+                    "A wider space between the two lines means the data differ more from the chosen reference.",
                 )
             )
         elif name == "regression":
@@ -119,7 +162,7 @@ def build_report(bundle, *, top_n=20):
                 (
                     "residuals",
                     _image(plot_residuals(result)),
-                    "Inspect residual shape and points with high influence.",
+                    "Look for points far from the main cluster or a changing spread across the chart.",
                 )
             )
             if "groups" in result.details:
@@ -127,7 +170,7 @@ def build_report(bundle, *, top_n=20):
                     (
                         "groups",
                         _image(plot_group_residuals(result)),
-                        "Compare residual distributions across groups.",
+                        "Compare how far each group's values sit above or below the model's predictions.",
                     )
                 )
         section_findings = [
@@ -137,8 +180,13 @@ def build_report(bundle, *, top_n=20):
         ]
         sections.append(
             {
-                "title": f"{name.replace('_', ' ').title()} · {result.column}",
+                "title": _title(result),
                 "numbers": numbers,
+                "number_rows": [
+                    (NUMBER_LABELS.get(key, key.replace("_", " ").title()), value)
+                    for key, value in numbers.items()
+                    if key not in ("bins", "observed", "expected", "z_scores")
+                ],
                 "charts": charts,
                 "reading": [f.statement for f in section_findings],
                 "caveats": result.caveats,
@@ -156,16 +204,33 @@ def build_report(bundle, *, top_n=20):
                     "threshold": ml.threshold,
                     "reviewed_records": len(ml.flagged_indices),
                 },
+                "number_rows": [
+                    (NUMBER_LABELS["index"], ml.index),
+                    (
+                        "Share of records above the review threshold",
+                        f"{ml.components['review_share']:.1%}",
+                    ),
+                    (
+                        "Combined size of differences (0–1)",
+                        f"{ml.components['normalized_effect']:.2f}",
+                    ),
+                    (
+                        "Combined reference-test signal (0–1)",
+                        f"{ml.components['adjusted_significance']:.2f}",
+                    ),
+                    (NUMBER_LABELS["threshold"], ml.threshold),
+                    (NUMBER_LABELS["reviewed_records"], len(ml.flagged_indices)),
+                ],
                 "charts": [
                     (
                         "scores",
                         _image(score_figure(ml.scores, ml.threshold)),
-                        "Higher values rank records as more unusual within this dataset.",
+                        "The farther right a score sits, the more unusual that record is compared with others here.",
                     ),
                     (
                         "top",
                         _image(top_records_figure(ml.scores, ml.contributions, top_n)),
-                        "Bars show the highest-scoring row positions and a contributing feature.",
+                        "These bars show the records most worth checking, with a measurement that stood out for each.",
                     ),
                 ],
                 "reading": [

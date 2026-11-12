@@ -21,7 +21,7 @@ def digit_figure(result, view="primary"):
     bins = np.asarray(d["bins"])
     observed, expected = np.asarray(d["observed"]), np.asarray(d["expected"])
     x = np.arange(len(bins))
-    fig, ax = plt.subplots(figsize=(12, 4.5))
+    fig, ax = plt.subplots(figsize=(12, 6.5))
     if view == "deviation":
         ax.bar(
             x,
@@ -31,7 +31,7 @@ def digit_figure(result, view="primary"):
         sd = np.sqrt(expected * (1 - expected) / max(result.n, 1))
         ax.plot(x, 1.96 * sd, "--", color=EXPECTED, label="95% bound")
         ax.plot(x, -1.96 * sd, "--", color=EXPECTED)
-        ax.set_ylabel("Observed − expected")
+        ax.set_ylabel("Seen in data − expected")
     elif view in ("primary", "log"):
         sd = np.sqrt(expected * (1 - expected) / max(result.n, 1))
         band = np.maximum(0, expected - 1.96 * sd - 0.5 / max(result.n, 1))
@@ -53,7 +53,7 @@ def digit_figure(result, view="primary"):
         if view == "log":
             ax.set_yscale("log")
             ax.set_ylim(bottom=max(1e-5, min(expected) * 0.1))
-        ax.set_ylabel("Proportion")
+        ax.set_ylabel("Share of values")
     else:
         raise ValueError("Unknown digit figure view")
     ticks = np.unique(np.linspace(0, len(x) - 1, min(20, len(x)), dtype=int))
@@ -62,8 +62,8 @@ def digit_figure(result, view="primary"):
         [f"{bins[i]:02d}" if d["mode"] == "last_two" else str(bins[i]) for i in ticks],
     )
     ax.set(
-        xlabel="Digit bin",
-        title=f"{d['mode'].replace('_', ' ').title()} digits · MAD {d['mad']:.4g} · {d['conformity']}",
+        xlabel="Digit group",
+        title=f"{d['mode'].replace('_', ' ').title()} digits · Average gap (MAD) {d['mad']:.4g} · {d['conformity']}",
     )
     ax.legend(loc="best")
     fig.tight_layout()

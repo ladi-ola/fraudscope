@@ -113,6 +113,13 @@ if df is not None:
             pd.DataFrame({"dtype": df.dtypes.astype(str), "missing": df.isna().sum()})
         )
         numeric = list(df.select_dtypes(include="number").columns)
+        non_numeric = [col for col in df.columns if col not in numeric]
+        if non_numeric:
+            st.info(
+                "Numeric tests will skip these non-numeric columns: "
+                + ", ".join(map(str, non_numeric))
+                + ". They remain in the dataset profile and can be selected as regression groups."
+            )
         observed_profile = profile_dataset(df)["column_profiles"]
         for col in numeric:
             ok, reasons = benford_applicable(df[col])
@@ -130,8 +137,13 @@ if df is not None:
         else:
             with st.sidebar:
                 st.header("Configure")
+                st.caption(
+                    "Each numeric column is analyzed separately by default. Deselect any you want to leave out."
+                )
                 columns = st.multiselect(
-                    "Numeric columns", numeric, default=numeric[:1]
+                    "Numeric columns (all selected by default)",
+                    numeric,
+                    default=numeric,
                 )
                 modes = st.multiselect(
                     "Digit modes",

@@ -16,3 +16,8 @@ def test_sample_smoke():
     app.button[0].click().run()
     assert not app.exception
     assert app.tabs
+    assert set(app.multiselect[0].value) == {"amount", "sequence"}
+    assert {result.column for result in app.session_state["bundle"].results} == {
+        "amount",
+        "sequence",
+    }

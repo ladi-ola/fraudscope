@@ -11,7 +11,14 @@ dependencies = ["numpy", "pandas", "scipy", "statsmodels", "matplotlib", "openpy
 
 [project.optional-dependencies]
 dev = ["pytest", "nbformat", "ruff", "black", "astropy"]
-app = ["streamlit>=1.40,<2", "scikit-learn>=1.5,<2", "jinja2>=3.1,<4", "reportlab>=4,<5"]
+app = [
+    "streamlit==1.40.1; python_version < '3.11'",
+    "streamlit==1.67.0; python_version >= '3.11'",
+    "scikit-learn==1.5.2; python_version < '3.11'",
+    "scikit-learn==1.9.1; python_version >= '3.11'",
+    "jinja2==3.1.6",
+    "reportlab==4.5.1",
+]
 
 [tool.setuptools]
 packages = ["fraudscope", "fraudscope.ml", "fraudscope.report", "benford"]

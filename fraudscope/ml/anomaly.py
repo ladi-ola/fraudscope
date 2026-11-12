@@ -81,12 +81,16 @@ def anomaly_index(results, scores, threshold=THRESHOLD):
 def score_records(df, config, results):
     """Score at least 30 rows, with median imputation and missing indicators."""
     n = len(df)
+    # Tests-only ablation: one vote per digit/ECDF flag, two for a regression
+    # diagnostic flag (the latter combines residual and influence checks).
     baseline = np.zeros(n)
     for result in results:
         if result.p_value is None:
             continue
         positions = np.asarray(result.flagged_indices, dtype=int)
-        baseline[positions[(positions >= 0) & (positions < n)]] += 1
+        baseline[positions[(positions >= 0) & (positions < n)]] += (
+            2 if result.test_name == "regression" else 1
+        )
     if n < MIN_ROWS:
         return AnomalyOutput(
             baseline=baseline.tolist(),

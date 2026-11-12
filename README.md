@@ -63,7 +63,7 @@ of these scenarios; do not assume ML adds value. The clean-data index averaged
 17.57; injected averages ranged from 17.57 (amount outliers) to 66.94 (digit
 preference). These are synthetic scenarios, not real-world performance claims.
 In a separate fitted-regression outlier scenario over the same three seeds,
-mean forest/baseline ROC-AUC was .900/.642 and precision@100 .550/.513. The
+mean forest/baseline ROC-AUC was .900/.681 and precision@100 .550/.490. The
 index was 29.46 for both clean and injected frames because its design excludes
 regression F-test significance and flag rate; this is a known blind spot.
 

@@ -1,144 +1,190 @@
 # fraudscope
 
-Python 3.10+ statistical anomaly detection for tabular data. **An anomaly is
-not proof of wrongdoing.** Optional unsupervised anomaly scoring; no hosted services or API keys.
+Explore statistical anomalies in tabular data using a local web app or a Python API.
 
-## Install
+> **An anomaly is not proof of wrongdoing.** Scores rank records within the
+> uploaded dataset; they are not probabilities or predictions of intent.
 
-```bash
-python -m pip install -e '.[dev]'
-python -m pytest -q tests benford_py/tests
-```
+## Get started
 
-## Web app
+**Web app** — Python 3.10+:
 
 ```bash
 python -m pip install -e '.[app]'
 streamlit run app/main.py
 ```
 
-Upload a CSV/XLSX file or choose either built-in sample. Select columns and
-digit modes, optionally compare to Benford log-mantissas, then run the analysis.
-The Benford chart band can be set to any whole-number level from 1% to 99%
-(95% by default). This changes only the shaded range and which bars are
-colored in the chart—not the test numbers, Findings, or flagged records. The
-band applies to each digit separately, not all digits at once.
-HTML, PDF and schema-versioned `findings.json` are available from the Report tab.
-**Screenshots:** placeholder (capture the app's Overview and Report tabs).
-The app, charts, and offline reports use bundled Source Code Pro (Adobe, SIL
-Open Font License 1.1); the font license is at
-`fraudscope/report/fonts/LICENSE.md`. Sans-serif is the fallback typeface.
+1. Upload a **CSV/XLSX** file, or click **Try with sample data**.
+2. All numeric columns are selected by default. Leave them selected, or choose
+   the ones you want to inspect. Non-numeric columns remain in the data profile.
+3. Optionally choose digit modes, a reference comparison, a regression model,
+   and the Benford chart band. Click **Run analysis**.
+4. Review results by tab. Download **HTML**, **PDF**, or `findings.json` from
+   the **Report** tab.
 
-Architecture:
+The Benford band can be any whole-number level from **1% to 99%** (default:
+95%). A narrower band colors more bars on the chart. Changing it **does not**
+change test results, written findings, or flagged records; each band applies
+to one digit at a time, not all digits together.
+
+### Screenshots
+
+_Placeholder: Overview and Report tab screenshots._
+
+## How it fits together
 
 ```text
-CSV/XLSX in memory → app/main.py → service.run_analysis → AnalysisBundle
-                                             ├─ v1 independent tests
-                                             ├─ optional Isolation Forest ranking
-                                             └─ deterministic Findings
-                   shared bundle → app tabs / HTML report / ReportLab PDF
+CSV / XLSX / built-in sample
+            │  processed in memory
+            ▼
+        Streamlit app ──────────────┐
+            │                      │
+            ▼                      │ displays
+    run_analysis(df, config)        │
+            │                      │
+            ├── Benford, KS, Kuiper, regression
+            ├── optional anomaly scoring
+            └── rule-based Findings
+                    │
+                    ▼
+             AnalysisBundle ────────┘
+                    │
+                    └── HTML report / PDF report / findings.json
 ```
 
-The app does not upload data to any external service or persist uploaded data
-to disk. No application-specific file-size or row-count cutoff is applied;
-uploads are still bounded by available memory and Streamlit's configurable
-`server.maxUploadSize` setting (200 MB by default). Increase that setting in
-your Streamlit configuration for larger files. Exports are assembled in memory.
-The core v1 package remains usable without Streamlit installed. All available
-sample sizes are analyzed, with observed counts and magnitude spans included in
-the report rather than a fixed minimum-count suitability rule. Sparse samples
-may produce unstable estimates; the report includes a conservative ECDF
-uncertainty bound based on the observed finite count.
+The app calls the same analysis service used to build the reports. **Findings**
+hold the numbers, severity, caveats, and deterministic written summaries; the
+app and reports read the same results. This structure can support a later story
+layer, but none is included now.
 
-Isolation Forest ranks records *relative to the current dataset*; its score and
-the 0–100 descriptive index are **not probabilities or evidence of intent**.
-Missing features receive median imputation and missing indicators; scoring is
-disabled only when no records or no variable numeric features are available.
-Very small sets can yield unstable relative rankings. The index is 100 × (0.2 × review share + 0.5 × mean
-normalized effect + 0.3 × mean adjusted significance), with components shown
-in exports. These scales are design choices, not universal statistical cutoffs.
-Because scores are rank-normalized, the default 0.90 review threshold selects
-roughly the highest 10% even for clean data; the review-share component alone
-must never be read as evidence that a dataset is anomalous.
-Effects are clipped at MAD .015/.012/.0022/.01 for first/second/first-two/
-last-two digits, KS D .2, and Kuiper V .3. Significance is
-`max(0, 1 - adjusted_p / .05)` for eligible distribution tests. The .2 and
-.3 scales are pragmatic, not published KS/Kuiper critical values; regression
-F-test significance is excluded because it measures association. Findings use
-Nigrini MAD guidance for the first three digit modes; last-two and diagnostic
-flag-rate severity bands are descriptive, not validated universal thresholds.
-`notebooks/05_ml_validation.ipynb` computes ROC-AUC and precision@k against
-the tests-only baseline. With 600 records, 100 injected positions and seeds
-2/7/17, mean ROC-AUC (forest / baseline) was: digit preference .837/.996,
-duplicates .732/.989, rounding .936/.790, uniform digits .968/.915, scaled
-subset .564/.503 and amount outliers .550/.490. Mean precision@100 was
-.293/.960, .150/.890, .607/.687, .767/.810, .237/.263 and .220/.263,
-respectively, in the same order. Forest precision was **worse in every one**
-of these scenarios; do not assume ML adds value. The clean-data index averaged
-17.57; injected averages ranged from 17.57 (amount outliers) to 66.94 (digit
-preference). These are synthetic scenarios, not real-world performance claims.
-In a separate fitted-regression outlier scenario over the same three seeds,
-mean forest/baseline ROC-AUC was .900/.681 and precision@100 .550/.490. The
-index was 29.46 for both clean and injected frames because its design excludes
-regression F-test significance and flag rate; this is a known blind spot.
+## Reading the results
 
-`Finding` records contain the numerical basis, severity, caveat references,
-and deterministic written statement used by both UI and reports. They provide
-the foundation for a later story layer; none is present here.
+| Check | What it looks for | Keep in mind |
+| --- | --- | --- |
+| **Benford** | Differences between observed and expected digit shares. Supports first, second, first-two, and last-two digits. | Bounded values, identifiers, prices, and rounding can explain differences. Last-two digits have no published conformity thresholds. |
+| **KS** | The largest gap between a sample's cumulative distribution and its chosen reference. | Choose a reference independently of the sample when possible. |
+| **Kuiper** | Gaps both above and below the reference; useful for shifts and circular data. | Small or discrete samples may need simulation for reliable p-values. |
+| **Regression** | Unusual prediction errors, influential rows, and differences between fitted relationships. | A marked row can be genuine; missing predictors or model assumptions may explain it. |
 
-One editable install exposes both `fraudscope` and the upstream `benford`
-package. The upstream BSD-3-Clause license and attribution remain in
-`benford_py/LICENSE.txt`. For the upstream baseline and additive modifications
-see `CHANGES.md`. Run the four examples in `notebooks/` with Jupyter.
+**Flags are starting-at-zero row positions** in the uploaded data, not DataFrame
+index labels. They identify rows to review, not wrongdoing. Each result includes
+warnings and possible innocent explanations. Where available, p-values are
+adjusted across the run for multiple checks.
 
-## Quickstart
+### Anomaly scoring: what it does *not* do
+
+Isolation Forest ranks records **relative to other records in the same
+dataset**. The 0–100 dataset index summarizes review share and distribution
+differences. Neither value is a probability. A score above the default 0.90
+threshold selects roughly the top 10% of records even for clean data.
+
+There is **no fixed minimum row count**. Scoring is unavailable if there are no
+records or no variable numeric features. Missing features are imputed using
+medians and given missing-value indicators. Very small samples can produce
+unstable rankings; the report gives the actual counts, value ranges, and a
+sample-size-based uncertainty guide.
+
+### What synthetic validation found
+
+`notebooks/05_ml_validation.ipynb` compares Isolation Forest with a **weighted
+tests-only flag baseline**. Each scenario below used 600 records, 100 altered rows,
+and seeds 2, 7, and 17. Values are averages:
+
+| Alteration | ROC-AUC: forest / baseline | Precision@100: forest / baseline |
+| --- | ---: | ---: |
+| Digit preference | .837 / .996 | .293 / .960 |
+| Duplicates | .732 / .989 | .150 / .890 |
+| Rounding | .936 / .790 | .607 / .687 |
+| Uniform digits | .968 / .915 | .767 / .810 |
+| Scaled subset | .564 / .503 | .237 / .263 |
+| Amount outliers | .550 / .490 | .220 / .263 |
+| Fitted-regression outliers (separate scenario) | .900 / .681 | .550 / .490 |
+
+**The forest's precision was worse than the baseline in all six amount-based
+scenarios.** It did better in the separate fitted-regression scenario; do not
+assume it adds value for other data. For the six amount-based scenarios, the
+clean-data index averaged 17.57 and altered-data averages ranged from 17.57
+(amount outliers) to 66.94 (digit preference). In the fitted-regression
+scenario, both clean and altered datasets scored 29.46: the index does not
+include regression flag rate, a known blind spot. These are **synthetic tests,
+not real-world performance estimates**.
+
+<details>
+<summary>Index formula and statistical notes</summary>
+
+The index is `100 × (0.2 × review share + 0.5 × mean normalized effect +
+0.3 × mean adjusted significance)`. Effect sizes are clipped at Benford MAD
+`.015/.012/.0022/.01` (first/second/first-two/last-two), KS D `.2`, and Kuiper
+V `.3`. Significance for eligible distribution tests is
+`max(0, 1 - adjusted_p / .05)`. These are descriptive design scales, **not
+universal statistical cutoffs**. Regression F-test significance is excluded
+because it measures association, not anomalous records. Nigrini's MAD
+guidelines inform the first three digit modes; last-two and regression flag-rate
+severity bands are descriptive only.
+
+`reference="benford"` for KS/Kuiper compares the fractional `log10(x)` of
+**positive values** with a uniform reference. This is different from comparing
+discrete digit frequencies. Discrete references can be supplied as
+`(sorted_bins, probabilities)` and use seeded Monte Carlo p-values. Kuiper's
+asymptotic p-value is approximate; use simulation/permutation for small or
+discrete data. Scaling a genuinely Benford-distributed subset can preserve its
+leading digits, so digit tests alone may miss that change.
+
+</details>
+
+## Python quickstart
+
+The original statistical API works without Streamlit:
 
 ```python
 import numpy as np
 import pandas as pd
-from scipy.stats import norm
-from fraudscope.ingest import load
-from fraudscope.runner import Config, RegressionSpec, run_all
-from fraudscope.plots import plot_summary_dashboard
 
-df = pd.DataFrame({"amount": 10 ** np.random.default_rng(2).uniform(1, 5, 2000),
-                   "sequence": np.arange(2000)})
-results = run_all(df, Config(columns=["amount"],
-                             benford_modes=["first", "second", "first_two", "last_two"],
-                             references={"amount": "benford"}, random_state=2))
-print([r.to_dict() for r in results])
-plot_summary_dashboard(results, "overview.png")
-# Or: df = load("data.csv", columns=["amount", "sequence"])
+from fraudscope.runner import Config, run_all
+
+rng = np.random.default_rng(2)
+df = pd.DataFrame({
+    "amount": 10 ** rng.uniform(1, 5, 2_000),
+    "sequence": np.arange(2_000),
+})
+
+results = run_all(df, Config(
+    columns=["amount"],
+    benford_modes=["first", "second", "first_two", "last_two"],
+    references={"amount": "benford"},
+    random_state=2,
+))
+print([result.to_dict() for result in results])
 ```
 
-`load` accepts CSV and XLSX, trims whitespace, converts fully numeric string
-columns, retains all rows, and stores cleaning counts in `df.attrs['cleaning']`.
-Record flags are **zero-based input row positions**, not DataFrame index labels.
+For a full `AnalysisBundle` with profile, optional scoring, Findings, and
+report-ready figures, use `fraudscope.service.run_analysis(df, config)`.
+`fraudscope.ingest.load("data.csv")` also accepts XLSX, trims whitespace,
+converts fully numeric text columns, retains rows, and records cleaning counts
+in `df.attrs["cleaning"]`. Direct tests with `strict=True` raise on unsuitable
+data; the runner isolates failures so one check does not end a whole run.
 
-## What the tests mean
+## Privacy, limits, and attribution
 
-- **Benford**: leading digits for naturally generated, unbounded magnitudes;
-  second, first-two and last-two (uniform cents by default) are supported.
-  MAD is the main descriptive measure; chi-square becomes sensitive to tiny
-  differences at large n. Last-two has no published conformity thresholds.
-  Bounded values, identifiers, pricing and rounding may depart innocently.
-  Multiplying a genuinely Benford-distributed subset by a constant preserves
-  its leading-digit law; such scaling is not reliably detectable by digit tests
-  alone. Compare against a known reference or groups to inspect range changes.
-- **KS**: largest one- or two-sample ECDF gap; most appropriate for continuous
-  references chosen independently of the sample. Discrete references must be
-  supplied as `(sorted_bins, probabilities)` and use seeded Monte Carlo p-values.
-- **Kuiper**: sum of positive and negative ECDF gaps; suited to circular data
-  (time-of-day) and shift/tail sensitivity. Its asymptotic p-value is approximate;
-  use Monte Carlo/permutation for small or discrete samples.
-- **Regression**: OLS and Huber estimates, influence measures and residual
-  diagnostics; a flagged observation can be genuine and assumptions or omitted
-  variables can explain patterns. Group comparisons are exploratory.
+- Uploaded data stays **in memory**. The app does not send it to an external
+  service or save it to disk. HTML and PDF reports are self-contained.
+- There is no application-specific row or file-size cutoff. Available memory
+  and Streamlit's configurable `server.maxUploadSize` setting still apply (the
+  Streamlit default is 200 MB). To raise the upload limit, for example:
+  `streamlit run app/main.py --server.maxUploadSize 500`.
+- The bundled Source Code Pro font (Adobe, SIL Open Font License 1.1) is used
+  offline in the app and reports, with sans-serif as fallback. See
+  `fraudscope/report/fonts/LICENSE.md`.
+- One editable install exposes both this package and the local `benford_py`
+  package. Its BSD-3-Clause license remains in `benford_py/LICENSE.txt`.
+  Upstream provenance and changes are documented in `CHANGES.md`.
 
-For `reference="benford"`, **positive values** are transformed to fractional
-`log10(x)` mantissas and compared to a uniform [0,1) CDF. This is not the
-discrete digit reference. `strict=True` raises when applicability heuristics
-fail in direct tests; the runner catches and reports failures independently.
-Every result has innocent-explanation `caveats`, test `warnings`, and optional
-BH-adjusted `details['p_adjusted']` across the run. Row flags locate bins or
-diagnostics to inspect; they do not attribute intent to an individual record.
+## Tests and examples
+
+```bash
+python -m pip install -e '.[app,dev]'
+python -m pytest -q tests benford_py/tests
+```
+
+The `notebooks/` directory contains four statistical demos and the ML
+validation notebook.

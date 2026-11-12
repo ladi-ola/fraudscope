@@ -75,6 +75,17 @@ def test_no_fixed_minimum_and_reported_sample_scale():
     assert pdf_report(bundle).startswith(b"%PDF")
 
 
+def test_report_tolerates_older_profile_shape():
+    bundle = run_analysis(
+        pd.DataFrame({"amount": [1.0, 400.0]}),
+        Config(["amount"], ml_enabled=False),
+    )
+    column = bundle.dataset_profile["column_profiles"]["amount"]
+    column.pop("finite_count")
+    column.pop("positive_count")
+    assert "NUMBERS" in html_report(bundle)
+
+
 def test_small_regression_uses_model_degrees_of_freedom():
     rng = np.random.default_rng(4)
     x = np.arange(12, dtype=float)

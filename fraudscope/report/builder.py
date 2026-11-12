@@ -55,6 +55,7 @@ def build_report(bundle, *, top_n=20):
                         "positive_orders_span",
                         "ecdf_95_band",
                     )
+                    if key in profile
                 }
             )
         charts = []

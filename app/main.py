@@ -107,7 +107,7 @@ if df is not None:
         st.warning("No data rows and columns were found.")
     else:
         st.subheader("Preview and profile")
-        st.dataframe(df.head(), use_container_width=True)
+        st.dataframe(df.head(), width="stretch")
         st.write(f"{len(df):,} rows · {len(df.columns)} columns")
         st.dataframe(
             pd.DataFrame({"dtype": df.dtypes.astype(str), "missing": df.isna().sum()})
@@ -116,11 +116,12 @@ if df is not None:
         observed_profile = profile_dataset(df)["column_profiles"]
         for col in numeric:
             ok, reasons = benford_applicable(df[col])
-            info = observed_profile[col]
+            info = observed_profile.get(col, {})
             st.caption(
-                f"{col}: {info['finite_count']} finite, {info['positive_count']} positive; "
-                f"range {info['finite_min']} to {info['finite_max']}; "
-                f"positive magnitude span {info['positive_orders_span']} orders · "
+                f"{col}: {info.get('finite_count', 'unavailable')} finite, "
+                f"{info.get('positive_count', 'unavailable')} positive; "
+                f"range {info.get('finite_min', 'unavailable')} to {info.get('finite_max', 'unavailable')}; "
+                f"positive magnitude span {info.get('positive_orders_span', 'unavailable')} orders · "
                 f"digit suitability {'OK' if ok else 'caution'} · "
                 f"{'; '.join(reasons) if reasons else 'No heuristic concerns'}"
             )
